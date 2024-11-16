@@ -1,7 +1,5 @@
 #include <iostream>
 
-int main()
-{
+class SIFT{
 
-    return 0;
 }
