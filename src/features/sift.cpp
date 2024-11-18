@@ -1,6 +1,8 @@
 #include <iostream>
 #include <math.h>
 #include <opencv2/opencv.hpp>
+#include <vector>
+#include <numeric>
 
 using namespace std;
 
@@ -77,11 +79,123 @@ vector<vector<cv::Mat>> buildDoGPyramid(const vector<vector<cv::Mat>> gaussPyram
     return DoGPyramid;
 }
 
+//Central difference for gradient computation
+cv::Mat computeGradient(const cv::Mat& patchCube) {
+    cv::Mat grad(1, 3, CV_32F);
+    grad.at<float>(0) = (patchCube.at<float>(2, 1, 1) - patchCube.at<float>(0, 1, 1)) * 0.5; // dx
+    grad.at<float>(1) = (patchCube.at<float>(1, 2, 1) - patchCube.at<float>(1, 0, 1)) * 0.5; // dy
+    grad.at<float>(2) = (patchCube.at<float>(1, 1, 2) - patchCube.at<float>(1, 1, 0)) * 0.5; // ds
+    return grad;
+}
+
+//Hessian computation
+cv::Mat computeHessian(const cv::Mat& patchCube) {
+    cv::Mat hessian = cv::Mat::zeros(3, 3, CV_32F);
+    float val = patchCube.at<float>(1, 1, 1);
+
+    // Second derivatives
+    hessian.at<float>(0, 0) = patchCube.at<float>(2, 1, 1) - 2 * val + patchCube.at<float>(0, 1, 1); // dxx
+    hessian.at<float>(1, 1) = patchCube.at<float>(1, 2, 1) - 2 * val + patchCube.at<float>(1, 0, 1); // dyy
+    hessian.at<float>(2, 2) = patchCube.at<float>(1, 1, 2) - 2 * val + patchCube.at<float>(1, 1, 0); // dss
+
+    // Mixed derivatives
+    hessian.at<float>(0, 1) = hessian.at<float>(1, 0) = 0.25f * ((patchCube.at<float>(2, 2, 1) - patchCube.at<float>(2, 0, 1)) -
+                                                                 (patchCube.at<float>(0, 2, 1) - patchCube.at<float>(0, 0, 1)));
+    hessian.at<float>(0, 2) = hessian.at<float>(2, 0) = 0.25f * ((patchCube.at<float>(2, 1, 2) - patchCube.at<float>(2, 1, 0)) -
+                                                                 (patchCube.at<float>(0, 1, 2) - patchCube.at<float>(0, 1, 0)));
+    hessian.at<float>(1, 2) = hessian.at<float>(2, 1) = 0.25f * ((patchCube.at<float>(1, 2, 2) - patchCube.at<float>(1, 2, 0)) -
+                                                                 (patchCube.at<float>(1, 0, 2) - patchCube.at<float>(1, 0, 0)));
+
+    return hessian;
+}
+
+//Check for extrema
+bool isExtremum(const cv::Mat& patchCube, float threshold) {
+    float centerValue = patchCube.at<float>(1, 1, 1);
+    if (std::fabs(centerValue) < threshold) return false;
+
+    bool isMax = true, isMin = true;
+    for (int z = 0; z < 3 && (isMax || isMin); z++) {
+        for (int y = 0; y < 3 && (isMax || isMin); y++) {
+            for (int x = 0; x < 3 && (isMax || isMin); x++) {
+                if (z == 1 && y == 1 && x == 1) continue; // Skip center
+                float value = patchCube.at<float>(z, y, x);
+                isMax &= (centerValue > value);
+                isMin &= (centerValue < value);
+            }
+        }
+    }
+    return isMax || isMin;
+}
+
+//Refining extrema
+cv::Point3f refineExtrema(const cv::Mat& patchCube, int maxIterations, float contrastThreshold) {
+    cv::Point3f refined(-1, -1, -1); // Default: invalid
+    cv::Mat gradient, hessian;
+    cv::Mat offset;
+
+    for (int iter = 0; iter < maxIterations; ++iter) {
+        gradient = computeGradient(patchCube);
+        hessian = computeHessian(patchCube);
+
+        offset = -hessian.inv(cv::DECOMP_SVD) * gradient.t();
+        if (cv::norm(offset) < 0.5) break;
+
+        //If offset is too large or invalid, return failure
+        if (cv::norm(offset) > 1.0f) return refined;
+    }
+
+    //Check contrast after interpolation
+    float interpolatedContrast = patchCube.at<float>(1, 1, 1) + 0.5f * gradient.dot(offset);
+    if (std::abs(interpolatedContrast) < contrastThreshold) return refined;
+
+    //Successful refinement
+    refined.x = offset.at<float>(0);
+    refined.y = offset.at<float>(1);
+    refined.z = offset.at<float>(2);
+    return refined;
+}
+
+//Scale-space extrema detection
+vector<cv::KeyPoint> scaleSpaceExtrema(
+    const vector<vector<cv::Mat>>& DoGPyramid, int numIntervals, float contrastThreshold, int imageBorder) {
+    vector<cv::KeyPoint> keypoints;
+    float prelimContrastThreshold = 0.5f * (contrastThreshold / numIntervals) / 255.0f;
+
+    for (int octaveIdx = 0; octaveIdx < DoGPyramid.size(); ++octaveIdx) {
+        const auto& octave = DoGPyramid[octaveIdx];
+        for (int imgIdx = 1; imgIdx < octave.size() - 1; ++imgIdx) {
+            for (int y = imageBorder; y < octave[imgIdx].rows - imageBorder; ++y) {
+                for (int x = imageBorder; x < octave[imgIdx].cols - imageBorder; ++x) {
+                    if (x - 1 < 0 || x + 1 >= octave[imgIdx].cols || y - 1 < 0 || y + 1 >= octave[imgIdx].rows) {
+                        continue;
+                    }
+
+                    cv::Mat patchCube = octave[imgIdx](cv::Rect(x - 1, y - 1, 3, 3)).clone();
+                    if (patchCube.rows != 3 || patchCube.cols != 3 || patchCube.type() != CV_32F) {
+                        continue;
+                    }
+
+                    if (isExtremum(patchCube, prelimContrastThreshold)) {
+                        cv::Point3f refined = refineExtrema(patchCube, 10, contrastThreshold);
+                        if (refined.x != -1) {
+                            cv::KeyPoint kp;
+                            kp.pt = cv::Point2f(x + refined.x, y + refined.y);
+                            kp.octave = octaveIdx;
+                            kp.response = patchCube.at<float>(1, 1);
+                            keypoints.push_back(kp);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return keypoints;
+}
 
 
 int main()
 {
-    //how can i get the base image in a variable
     string imgpath = "../dataset/nurmahal/nuramal.jpg";
     cv::Mat baseImage;
     baseImage = createBaseImage(imgpath);
@@ -96,8 +210,23 @@ int main()
     vector<float> sigmas = genGaussianSigmas();
     //build gaussian pyramid
     vector<vector<cv::Mat>> gaussPyramid = buildGausPyramid(baseImage, num_octaves, sigmas,3);
+    cout << "Number of images in each octave of GausPyramid: " << gaussPyramid[0].size() << endl;
+    
     //build Difference of Gaussian Pyramid
     vector<vector<cv::Mat>> DoGPyramid = buildDoGPyramid(gaussPyramid, 3);
+
+    cout << "Number of images in each octave of DoGPyramid: " << DoGPyramid[0].size() << endl;
+
+    //scale-space extrema detection
+    vector<cv::KeyPoint> keypoints = scaleSpaceExtrema(DoGPyramid, 3, 0.04, 1);
+    cout << "Number of keypoints: " << keypoints.size() << endl;
+    
+    cv::Mat keypointImage;
+    cv::drawKeypoints(baseImage, keypoints, keypointImage);
+    cv::imshow("Keypoints", keypointImage);
+    cv::waitKey(0);
+    cv::destroyAllWindows();
+
     cout << "SIFT completed!" << endl;
     return 0;
 }
