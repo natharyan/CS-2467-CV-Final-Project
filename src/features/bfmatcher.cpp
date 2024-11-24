@@ -28,8 +28,8 @@ vector<string> desctoBinary(vector<int> descSingle){
     return bin_desc;
 }
 
-// get hamming distance
-int calHammingDistance(vector<string> descBin1, vector<string> descBin2){
+// get hamming distance for vector containing multiple binary strings
+int computeHammingDistance(vector<string> descBin1, vector<string> descBin2){
     int hamming_dist = 0;
     int loop_range;
     if(descBin1.size() != descBin2.size()){
@@ -49,9 +49,28 @@ int calHammingDistance(vector<string> descBin1, vector<string> descBin2){
     return hamming_dist;
 }
 
-// get feature matches - and corresponding keypoint matches, with threshold on the hamming distance
-vector<pair(int,int)> getMatches_Keypoints()
+// get the keypoint matches
+// for each feature, return the closest one in the other set
+vector<pair(int,int)> getMatches_Keypoints(vector<string> descBin1, vector<string> descBin2){
+    // iterate over each feature of img1, compute the best feature match, (optional parameter of hamming threshold - add later)
+    // for each store the keypoint matches.
+    vector<pair(pair(int,int),pair(int,int))> matches;
+    int loop_range;
+    if(descBin1.size() != descBin2.size()){
+        loop_range = min(descBin1.size(),descBin2.size());
+    }else{
+        loop_range = descBin1.size();
+    }
+    for(int i = 0; i < loop_range-1; i++){
+        int best_match_val = 1000;
+        for(int j = i; j < loop_range; j++){
+            if(computeHammingDistance(descBin1.row(i)))
+        }
+    }
+}
 
+
+// get the number of matches
 
 int main(){
     // get orb keypoints and descriptors
