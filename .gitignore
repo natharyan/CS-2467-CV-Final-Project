@@ -1,2 +1,5 @@
 notes.txt
 # opencvcheck/
+.vscode/
+proposal.md
+.DS_Store
