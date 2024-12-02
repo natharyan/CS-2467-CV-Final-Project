@@ -193,7 +193,7 @@ struct KeypointWithResponse {
 };
 
 int main(){
-    string imgpath = "/Users/manyagarggg/Desktop/Screenshot 2024-11-24 at 3.35.31 PM.png";
+    string imgpath = "../../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg";
     cv::Mat baseImage;
     baseImage = createBaseImage(imgpath);
     cout << "SIFT running..." << endl;
@@ -235,6 +235,7 @@ int main(){
         filteredKeypoints.push_back(kpWithResponse.point);
         orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
     }
+    cout << filteredKeypoints << endl; 
 
     vector<KeyPoint> cvKeypoints;
     for (const auto& point : filteredKeypoints) {
@@ -250,7 +251,7 @@ int main(){
     cv::Mat displayImage;
     cvtColor(baseImage, displayImage, COLOR_GRAY2BGR);  
 
-    // Step 5: Display keypoints on the image
+    // Display keypoints on the image
     Mat imgWithKeypoints;
     drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, Scalar(0, 255, 0), DrawMatchesFlags::DEFAULT);
 
