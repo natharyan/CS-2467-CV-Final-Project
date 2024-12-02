@@ -70,7 +70,7 @@ vector<pair<int, int>> getMatches_Keypoints(const cv::Mat& descriptors1, const c
         if (best_match_index != -1) {
             //Use Lowe's ratio test to check if the match is a good one
             // cout << "best hamming distance: " << best_hamming_dist << endl;
-            if(best_hamming_dist < 45){
+            if(best_hamming_dist < 40){
                 matches.push_back({i, best_match_index});
             }
         }
@@ -110,8 +110,10 @@ void plotMatches(cv::Mat img1, cv::Mat img2, vector<cv::KeyPoint> keypoints1, ve
 
 int main(){
     // Get ORB keypoints and descriptors
-    cv::Mat img1 = cv::imread("../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg", cv::IMREAD_GRAYSCALE);
-    cv::Mat img2 = cv::imread("../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (2).jpeg", cv::IMREAD_GRAYSCALE);
+    // cv::Mat img1 = cv::imread("../dataset/Toy/20241126_015741.jpg", cv::IMREAD_GRAYSCALE);
+    // cv::Mat img2 = cv::imread("../dataset/Toy/20241126_015753.jpg", cv::IMREAD_GRAYSCALE);
+    cv::Mat img1 = cv::imread("../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.19 (1).jpeg", cv::IMREAD_GRAYSCALE);
+    cv::Mat img2 = cv::imread("../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.20 (1).jpeg", cv::IMREAD_GRAYSCALE);
 
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
