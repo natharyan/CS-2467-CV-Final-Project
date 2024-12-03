@@ -1,0 +1,2 @@
+dataset/maingate_statue/2.jpg
+dataset/maingate_statue/1.jpg
