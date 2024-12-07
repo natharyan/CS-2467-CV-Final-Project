@@ -192,6 +192,8 @@ int main(){
 
     cout << "Rotation matrix: " << endl << R << endl;
     cout << "Translation vector: " << endl << t << endl;
+
+    
     
     return 0;
 // TODO: undistort the images
