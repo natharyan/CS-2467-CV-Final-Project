@@ -10,6 +10,39 @@ namespace fs = std::filesystem;
 
 using namespace std;
 
+
+// We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair.
+
+
+// get the essential matrix from the fundamental matrix
+
+cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
+    cv::Mat E = K.t() * fundamental_matrix * K;
+    return E;
+}
+
+// decompose the essential matrix to get the rotation matrix and translation vector between the initial image pair
+
+pair<cv::Mat, cv::Mat> RotationAndTranslation(cv::Mat essential_matrix){
+    cv::Mat W, U, Vt;
+
+    // decompose the essential matrix to get the rotation matrix and translation vector
+    // essential matrix = U * diag(s, s, 0) * Vt where the diagonal matrix contains the singular values from the essential matrix
+    cv::SVD svd(essential_matrix, cv::SVD::FULL_UV);
+
+    W = (cv::Mat_<double>(3, 3) << 0, -1, 0, 1, 0, 0, 0, 0, 1);
+    U = svd.u;
+    Vt = svd.vt;
+
+    // generate candidate rotation matrices and the translation vector
+    cv::Mat R1 = U * W * Vt;
+    cv::Mat R2 = U * W.t() * Vt;
+    // get the third column of the U matrix as the translation vector (up to scale)
+    cv::Mat t = U.col(2);
+
+    return {R1, t};
+}
+
 int main(){
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
@@ -79,6 +112,10 @@ int main(){
     vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
     plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+
+
+    // get the camera matrix from file 
+
 
     return 0;
 
