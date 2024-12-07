@@ -43,6 +43,64 @@ pair<cv::Mat, cv::Mat> RotationAndTranslation(cv::Mat essential_matrix){
     return {R1, t};
 }
 
+
+// get the camera intrinsics from calibration file
+pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
+    ifstream calibration_file("src/helpers/calibration.txt");
+    if (!calibration_file.is_open()) {
+        cerr << "Failed to open calibration file!" << endl;
+        throw runtime_error("Calibration file not found");
+    }
+
+    cv::Mat K, distortion_coefficients;
+    string line;
+    vector<double> K_data, dist_data;
+
+    // Read camera matrix
+    if (getline(calibration_file, line)) {
+        stringstream ss(line);
+        double val;
+        while(ss >> val){
+            K_data.push_back(val);
+        }
+    }
+
+    // Read distortion coefficients
+    if (getline(calibration_file, line)) {
+        stringstream ss(line);
+        double val;
+        while(ss >> val){
+            dist_data.push_back(val);
+        }
+    }
+
+    // Verify data
+    if (K_data.size() != 9) {
+        cerr << "Invalid number of values for camera matrix. Got " << K_data.size() << endl;
+        throw runtime_error("Incorrect camera matrix format");
+    }
+
+    if (dist_data.size() != 5) {
+        cerr << "Invalid number of distortion coefficients. Got " << dist_data.size() << endl;
+        throw runtime_error("Incorrect distortion coefficients format");
+    }
+
+    // Create matrices
+    K = (cv::Mat_<double>(3, 3) << 
+        K_data[0], K_data[1], K_data[2], 
+        K_data[3], K_data[4], K_data[5], 
+        K_data[6], K_data[7], K_data[8]);
+
+    distortion_coefficients = (cv::Mat_<double>(1, 5) << 
+        dist_data[0], dist_data[1], dist_data[2], 
+        dist_data[3], dist_data[4]);
+
+    return {K, distortion_coefficients};
+}
+
+
+
+
 int main(){
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
@@ -114,9 +172,27 @@ int main(){
     plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
 
 
-    // get the camera matrix from file 
+    // get the camera intrinsics from calibration file
+    // TODO: fix this
+    // pair<cv::Mat,cv::Mat> intrinsics = getCameraIntrinsics();
+    // cv::Mat K = intrinsics.first;
+    // cv::Mat distortion_coefficients = intrinsics.second;
+    // cout << "Camera intrinsics: " << endl << K << endl;
+    // cout << "Distortion coefficients: " << endl << distortion_coefficients << endl;
 
+    //K = [[3.04690978e+03 0.00000000e+00 1.58798925e+03] [0.00000000e+00 3.04241561e+03 1.52143054e+03] [0.00000000e+00 0.00000000e+00 1.00000000e+00]]
+    // distortion_coefficients = [[ 3.92176156e-02 -4.71862125e-01  1.37646274e-03  4.51593168e-04 1.81876525e+00]]
+    cv::Mat K = (cv::Mat_<double>(3, 3) << 3.04690978e+03, 0.00000000e+00, 1.58798925e+03, 0.00000000e+00, 3.04241561e+03, 1.52143054e+03, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
+    cv::Mat distortion_coefficients = (cv::Mat_<double>(1, 5) << 3.92176156e-02, -4.71862125e-01, 1.37646274e-03, 4.51593168e-04, 1.81876525e+00);
 
+    cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
+    pair<cv::Mat, cv::Mat> R_t = RotationAndTranslation(E);
+    cv::Mat R = R_t.first;
+    cv::Mat t = R_t.second;
+
+    cout << "Rotation matrix: " << endl << R << endl;
+    cout << "Translation vector: " << endl << t << endl;
+    
     return 0;
-
+// TODO: undistort the images
 }
