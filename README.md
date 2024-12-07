@@ -1,37 +1,40 @@
 Week 1: Feature Detection, Matching, and Initial Pair Selection
 Feature Detection and Extraction:
-We’ll first implement SIFT or ORB from scratch or using OpenCV functions to detect and extract keypoints and descriptors from the images.(done - left to integrate)
+We’ll first implement SIFT or ORB from scratch or using OpenCV functions to detect and extract keypoints and descriptors from the images.(done - left to integrate)(Manya)
 Output: Keypoints and descriptors for each image.
 Deliverables: Visualization of the detected key points on sample images to confirm quality and density.
 
 Feature Matching:
-We’ll then employ a matching algorithm like Brute-Force Matcher (BFMatcher)(done)
- or FLANN-based matcher for descriptor matching between image pairs. 
- We’ll perform filter matching using Lowe’s ratio test to remove ambiguous matches.(done)
-Output: Matched keypoints between image pairs.
-Deliverables: Plotted matches between image pairs to ensure correctness.
+We’ll then employ a matching algorithm like Brute-Force Matcher (BFMatcher)(done)(Aryan)
+ or FLANN-based matcher for descriptor matching between image pairs. (Aryan)
+ We’ll perform filter matching using Lowe’s ratio test to remove ambiguous matches.(done)(Aryan)
+Output: Matched keypoints between image pairs.(Manya)
+Deliverables: Plotted matches between image pairs to ensure correctness.(done)(Manya)
 
 Initial Pair Selection:
-We’ll use a geometric criterion (e.g., maximum number of inliers from epipolar constraint) to select the best initial image pair(done).
-We’ll implement the 8-point algorithm or use RANSAC to estimate the fundamental matrix and remove outliers.
+We’ll use a geometric criterion (e.g., maximum number of inliers from epipolar constraint) to select the best initial image pair(done).(Aryan)
+We’ll implement the 8-point algorithm or use RANSAC to estimate the fundamental matrix and remove outliers.(Manya)
 Output: Fundamental matrix and inlier matches.
-Deliverables: Visualization of the epipolar lines and inliers.(done)
+Deliverables: Visualization of the epipolar lines and inliers.(done)(Aryan)
 
 #########################################################################################
 
 Week 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
 
 Camera Pose Estimation:
-We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair. We’ll choose the correct pose by ensuring positive depth for the reconstructed points.
+We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair. (Aryan)
+We’ll choose the correct pose by ensuring positive depth for the reconstructed points.(Aryan)
 Output: Rotation and translation matrices for the initial pair.
 Deliverables: We’ll document the selection process for the correct pose.
 
-Triangulation:
-We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras.
-Output: 3D point cloud for the initial image pair.
-Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D.
+Triangulation:(Manya)
+We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras.(Manya)
+Output: 3D point cloud for the initial image pair.(Manya)
+Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D.(Manya)
 
 #########################################################################################
+
+(post 10th for Aryan)
 
 Week 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
 

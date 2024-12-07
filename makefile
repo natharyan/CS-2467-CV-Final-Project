@@ -10,7 +10,7 @@ LDFLAGS = -L/opt/homebrew/Cellar/opencv/4.10.0_12/lib -lopencv_core -lopencv_hig
 # Target executable
 TARGET = bin/app
 
-SRC = src/main.cpp src/bfmatcher.cpp
+SRC = src/main.cpp src/bfmatcher.cpp src/epipolar.cpp
 
 # Build target
 all: $(TARGET)
