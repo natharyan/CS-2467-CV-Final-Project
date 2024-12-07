@@ -137,7 +137,6 @@ void plotEpipolarLinesAndInliers(cv::Mat &img1, cv::Mat &img2, vector<cv::Point2
     cv::waitKey(0);
 }
 
-
 int main(){
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;

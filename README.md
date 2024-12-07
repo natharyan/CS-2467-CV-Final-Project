@@ -1,18 +1,21 @@
 Week 1: Feature Detection, Matching, and Initial Pair Selection
 Feature Detection and Extraction:
-We’ll first implement SIFT or ORB from scratch or using OpenCV functions to detect and extract keypoints and descriptors from the images.
+We’ll first implement SIFT or ORB from scratch or using OpenCV functions to detect and extract keypoints and descriptors from the images.(done - left to integrate)
 Output: Keypoints and descriptors for each image.
 Deliverables: Visualization of the detected key points on sample images to confirm quality and density.
 
 Feature Matching:
-We’ll then employ a matching algorithm like Brute-Force Matcher (BFMatcher) or FLANN-based matcher for descriptor matching between image pairs. We’ll perform filter matching using Lowe’s ratio test to remove ambiguous matches.
+We’ll then employ a matching algorithm like Brute-Force Matcher (BFMatcher)(done)
+ or FLANN-based matcher for descriptor matching between image pairs. 
+ We’ll perform filter matching using Lowe’s ratio test to remove ambiguous matches.(done)
 Output: Matched keypoints between image pairs.
 Deliverables: Plotted matches between image pairs to ensure correctness.
 
 Initial Pair Selection:
-We’ll use a geometric criterion (e.g., maximum number of inliers from epipolar constraint) to select the best initial image pair. We’ll implement the 8-point algorithm or use RANSAC to estimate the fundamental matrix and remove outliers.
+We’ll use a geometric criterion (e.g., maximum number of inliers from epipolar constraint) to select the best initial image pair(done).
+We’ll implement the 8-point algorithm or use RANSAC to estimate the fundamental matrix and remove outliers.
 Output: Fundamental matrix and inlier matches.
-Deliverables: Visualization of the epipolar lines and inliers.
+Deliverables: Visualization of the epipolar lines and inliers.(done)
 
 #########################################################################################
 
