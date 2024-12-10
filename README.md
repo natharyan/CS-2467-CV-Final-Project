@@ -1,4 +1,4 @@
-# Week 1: Feature Detection, Matching, and Initial Pair Selection
+# Part 1: Feature Detection, Matching, and Initial Pair Selection
 
 ## Feature Detection and Extraction:
 We’ll first implement SIFT or ORB from scratch or using OpenCV functions to detect and extract keypoints and descriptors from the images.(done - left to integrate)(Manya)
@@ -20,7 +20,7 @@ We’ll implement the 8-point algorithm or use RANSAC to estimate the fundamenta
 
 #########################################################################################
 
-# Week 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
+# Part 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
 
 ## Camera Pose Estimation:
 We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair. (Aryan)
@@ -36,7 +36,7 @@ We’ll then implement a triangulation method (e.g., Direct Linear Transform) to
 
 #########################################################################################
 
-# Week 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
+# Part 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
 
 ## Incremental Image Addition:
 Implement an image addition loop where new images are added based on overlapping 2D-3D correspondences (Manya).
@@ -44,7 +44,7 @@ Estimate the new camera pose using PnP (Perspective-n-Point) with RANSAC. Triang
 - Output: Incremental 3D point cloud with more views added (Manya).
 - Deliverables: Visualize step-by-step growth of the 3D model (Manya).
 
-## Bundle Adjustment(on each increment perform bundle adjustment to refine the camera parameters and 3D points):
+## Bundle Adjustment (on each increment perform bundle adjustment to refine the camera parameters and 3D points):
 We’ll implement or integrate a basic bundle adjustment using libraries like Ceres Solver or g2o to refine camera parameters and 3D points (Manya).
 - Output: Optimized camera poses and 3D structure (Manya).
 - Deliverables: We’ll show the before-and-after comparison of the point cloud (Manya).
