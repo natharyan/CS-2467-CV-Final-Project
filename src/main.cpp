@@ -12,11 +12,7 @@ namespace fs = std::filesystem;
 using namespace std;
 
 
-// We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair.
-
-
 // get the essential matrix from the fundamental matrix
-
 cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
     cv::Mat E = K.t() * fundamental_matrix * K;
     return E;
@@ -193,7 +189,7 @@ int main(){
 
     vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
-    // plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
 
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
     vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
@@ -242,68 +238,6 @@ int main(){
 
     cout << "Rotation matrix: " << endl << R << endl;
     cout << "Translation vector: " << endl << t << endl;
-
-    // verify the results using the triangulated points
-    cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
-    cv::Mat Rt_combined;
-    cv::hconcat(R, t, Rt_combined); // Combine R and t
-    cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
-
-    vector<cv::Point3d> points3d;
-    cv::Mat points4d;
-    cv::triangulatePoints(P1, P2, normalized_points1, normalized_points2, points4d);
-
-    for (int i = 0; i < points4d.cols; i++) {
-    if (points4d.at<double>(3, i) != 0) {
-        cv::Mat point4d = points4d.col(i);
-        point4d /= point4d.at<double>(3, 0); // Normalize
-        points3d.push_back(cv::Point3d(
-            point4d.at<double>(0, 0),
-            point4d.at<double>(1, 0),
-            point4d.at<double>(2, 0)));
-        } else {
-            std::cerr << "Point " << i << " has zero w coordinate and will be skipped." << std::endl;
-        }
-    }
-
-    if (points3d.empty()) {
-        std::cerr << "Point cloud is empty!" << std::endl;
-        return -1;
-    }
-
-    // Scale the points for visualization
-    std::vector<cv::Point3d> scaled_points3d;
-    double scale_factor = 1e5; // Scale up points for better visualization
-    for (const auto& point : points3d) {
-        scaled_points3d.emplace_back(point.x * scale_factor, point.y * scale_factor, point.z * scale_factor);
-    }
-
-    for(int i = 0; i < 10; i++){
-        cout << points3d[i].x << " " << points3d[i].y << " " << points3d[i].z << endl;
-    }
-
-    // Create Viz3d window
-    cv::viz::Viz3d window("3D Points");
-    window.setWindowSize(cv::Size(1500, 1500));
-    window.setWindowPosition(cv::Point(150, 150));
-    window.setBackgroundColor(cv::viz::Color::white());
-
-    // Add scaled point cloud widget
-    cv::viz::WCloud cloud_widget(scaled_points3d, cv::viz::Color::red());
-    window.showWidget("point_cloud", cloud_widget);
-
-    // Adjust the camera position
-    cv::Affine3d camera_pose = cv::viz::makeCameraPose(
-        cv::Vec3d(0, 0, -2),  // Camera position
-        cv::Vec3d(0, 0, 0),   // Look at origin
-        cv::Vec3d(0, -1, 0)   // Up vector
-    );
-    window.setViewerPose(camera_pose);
-
-    // Start visualization
-    window.spin();
-
-
 
     return 0;
 }

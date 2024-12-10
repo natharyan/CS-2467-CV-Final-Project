@@ -23,14 +23,15 @@ Week 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
 
 Camera Pose Estimation: *(Aryan)*
 We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair.*(done) (Aryan)*
-We’ll choose the correct pose by ensuring positive depth for the reconstructed points.*(done) (Aryan)* *(NOTE: chierality test passed only after undistorting and normalizing the images)*
-Output: Rotation and translation matrices for the initial pair. *(done) (Aryan)*
-Deliverables: We’ll document the selection process for the correct pose. *(later) (Aryan)*
+We’ll choose the correct pose by ensuring positive depth for the reconstructed points.*(done) (Aryan)* *(NOTE: chierality test passed only after normalizing and undistorting the images)*
+Output: Rotation and translation matrices for the initial pair. *(done)*
+Deliverables: We’ll document the selection process for the correct pose. *(later)*
 
 Triangulation: *(Manya)*
 We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras. *(Manya)*
 Output: 3D point cloud for the initial image pair. *(Manya)*
 Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D. *(Manya)*
+Triangulation: *(Manya)*
 
 #########################################################################################
 
