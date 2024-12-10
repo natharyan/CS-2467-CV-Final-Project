@@ -19,7 +19,6 @@ cv::Mat epipolar_line(cv::Mat fundamental_matrix, cv::Point2d keypoint1){
 // get inliers based on the epipolar constraint
 vector<bool> getInliers(cv::Mat fundamental_matrix, vector<cv::Point2f> &points1, vector<cv::Point2f> &points2, double epsilon){
     vector<bool> inliers;
-    cout << "(inliers)epsilon: " << epsilon << endl;
     for(int i = 0; i < points1.size(); i++){
         cv::Mat keypoint1_mat = (cv::Mat_<double>(3,1) << points1[i].x, points1[i].y, 1);//define homogenous coordinate
         cv::Mat keypoint2_mat = (cv::Mat_<double>(3,1) << points2[i].x, points2[i].y, 1);//define homogenous cooridnate
@@ -44,7 +43,6 @@ vector<bool> getInliers(cv::Mat fundamental_matrix, vector<cv::Point2f> &points1
 bool epipolar_contraint(cv::Mat fundamental_matrix, cv::Point2d keypoint1, cv::Point2d keypoint2, double epsilon){
     cv::Mat keypoint1_mat = (cv::Mat_<double>(3,1) << keypoint1.x, keypoint1.y, 1);//define homogenous coordinate
     cv::Mat keypoint2_mat = (cv::Mat_<double>(3,1) << keypoint2.x, keypoint2.y, 1);//define homogenous cooridnate
-    cout << "(constraint)epsilon: " << epsilon << endl;
     cv::Mat epipolar_line_2 = epipolar_line(fundamental_matrix, keypoint1);
 
     double error = keypoint2_mat.dot(epipolar_line_2);

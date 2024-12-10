@@ -23,7 +23,7 @@ cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
 
 // decompose the essential matrix to get the rotation matrix and translation vector between the initial image pair
 
-pair<cv::Mat, cv::Mat> RotationAndTranslation(cv::Mat essential_matrix){
+vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix){
     cv::Mat W, U, Vt;
 
     // decompose the essential matrix to get the rotation matrix and translation vector
@@ -39,8 +39,8 @@ pair<cv::Mat, cv::Mat> RotationAndTranslation(cv::Mat essential_matrix){
     cv::Mat R2 = U * W.t() * Vt;
     // get the third column of the U matrix as the translation vector (up to scale)
     cv::Mat t = U.col(2);
-
-    return {R1, t};
+    vector<pair<cv::Mat, cv::Mat>> candidates = {{R1, t}, {R2, t}, {R1, -t}, {R2, -t}};
+    return candidates;
 }
 
 
@@ -152,28 +152,9 @@ int main(){
         points1.push_back(match.first.pt);
         points2.push_back(match.second.pt);
     }
-    
-    // plot the epipolar lines and inliers for the initial image pair
-    int num_inliers = 0;
-    cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
-    cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
-    for(int k = 0; k < points1.size(); k++){
-        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
-        if(epipolar_constraint_satisfied){
-            num_inliers += 1;
-        }
-    }
-    if(num_inliers > 0){
-        cout << "max number of inliers: " << num_inliers << endl;
-    }
-
-    vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
-
-    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
-
 
     // get the camera intrinsics from calibration file
-    // TODO: fix this
+    // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)
     // pair<cv::Mat,cv::Mat> intrinsics = getCameraIntrinsics();
     // cv::Mat K = intrinsics.first;
     // cv::Mat distortion_coefficients = intrinsics.second;
@@ -185,16 +166,82 @@ int main(){
     cv::Mat K = (cv::Mat_<double>(3, 3) << 3.04690978e+03, 0.00000000e+00, 1.58798925e+03, 0.00000000e+00, 3.04241561e+03, 1.52143054e+03, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
     cv::Mat distortion_coefficients = (cv::Mat_<double>(1, 5) << 3.92176156e-02, -4.71862125e-01, 1.37646274e-03, 4.51593168e-04, 1.81876525e+00);
 
+    // undistort and normalize points
+    vector<cv::Point2f> normalized_points1, normalized_points2;
+    cv::undistortPoints(points1, normalized_points1, K, distortion_coefficients);
+    cv::undistortPoints(points2, normalized_points2, K, distortion_coefficients);
+    // points1 = normalized_points1;
+    // points2 = normalized_points2;
+    cout << endl;
+    // plot the epipolar lines and inliers for the initial image pair
+    int num_inliers = 0;
+    // TODO: implement fundamental matrix using ransac from scratch
+    cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+    cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
+    for(int k = 0; k < points1.size(); k++){
+        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
+        if(epipolar_constraint_satisfied){
+            num_inliers += 1;
+        }
+    }
+    cout << endl;
+    if(num_inliers > 0){
+        cout << "max number of inliers: " << num_inliers << endl;
+    }
+    cout << endl;
+
+    vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
+
+    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
-    pair<cv::Mat, cv::Mat> R_t = RotationAndTranslation(E);
-    cv::Mat R = R_t.first;
-    cv::Mat t = R_t.second;
+    vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
+
+    // use cheirality check to get the correct rotation and translation
+    cv::Mat R, t;
+    int counter = 0;
+    for (pair<cv::Mat, cv::Mat> R_t : rotation_translationCandidates) {
+        // normalize the translation vector
+        R_t.second /= cv::norm(R_t.second);
+
+        // construct projection matrices
+        cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
+        cv::Mat Rt_combined;
+        cv::hconcat(R_t.first, R_t.second, Rt_combined); // Combine R and t
+        cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
+
+        // triangulate points
+        vector<cv::Point3d> points3d;
+        cv::Mat points4d;
+        // TODO: implement triangulation from scratch
+        cv::triangulatePoints(P1, P2, normalized_points1, normalized_points2, points4d);
+
+        for (int i = 0; i < points4d.cols; i++) {
+            cv::Mat point4d = points4d.col(i);
+            point4d /= point4d.at<double>(3, 0); // Normalize homogeneous coordinates
+            points3d.push_back(cv::Point3d(point4d.at<double>(0, 0), point4d.at<double>(1, 0), point4d.at<double>(2, 0)));
+        }
+
+        // check cheirality condition
+        bool cheirality = true;
+        for (cv::Point3d point3d : points3d) {
+            if (point3d.z < -1e-6) { // Allow small tolerance for numerical errors
+                cheirality = false;
+                break;
+            }
+        }
+        if (cheirality) {
+            R = R_t.first;
+            t = R_t.second;
+            cout << "Cheirality check passed for candidate " << counter << endl;
+            break;
+        }
+        counter++;
+    }
 
     cout << "Rotation matrix: " << endl << R << endl;
     cout << "Translation vector: " << endl << t << endl;
 
-    
-    
     return 0;
-// TODO: undistort the images
+// TODO: Add normalization and undistortion before plotting the epipolar lines and inliers
 }
