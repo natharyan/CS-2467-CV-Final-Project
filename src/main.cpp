@@ -193,7 +193,7 @@ int main(){
 
     vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
-    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+    // plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
 
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
     vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
@@ -282,26 +282,26 @@ int main(){
         cout << points3d[i].x << " " << points3d[i].y << " " << points3d[i].z << endl;
     }
 
-    // // Create Viz3d window
-    // cv::viz::Viz3d window("3D Points");
-    // window.setWindowSize(cv::Size(1500, 1500));
-    // window.setWindowPosition(cv::Point(150, 150));
-    // window.setBackgroundColor(cv::viz::Color::white());
+    // Create Viz3d window
+    cv::viz::Viz3d window("3D Points");
+    window.setWindowSize(cv::Size(1500, 1500));
+    window.setWindowPosition(cv::Point(150, 150));
+    window.setBackgroundColor(cv::viz::Color::white());
 
-    // // Add scaled point cloud widget
-    // cv::viz::WCloud cloud_widget(scaled_points3d, cv::viz::Color::red());
-    // window.showWidget("point_cloud", cloud_widget);
+    // Add scaled point cloud widget
+    cv::viz::WCloud cloud_widget(scaled_points3d, cv::viz::Color::red());
+    window.showWidget("point_cloud", cloud_widget);
 
-    // // Adjust the camera position
-    // cv::Affine3d camera_pose = cv::viz::makeCameraPose(
-    //     cv::Vec3d(0, 0, -2),  // Camera position
-    //     cv::Vec3d(0, 0, 0),   // Look at origin
-    //     cv::Vec3d(0, -1, 0)   // Up vector
-    // );
-    // window.setViewerPose(camera_pose);
+    // Adjust the camera position
+    cv::Affine3d camera_pose = cv::viz::makeCameraPose(
+        cv::Vec3d(0, 0, -2),  // Camera position
+        cv::Vec3d(0, 0, 0),   // Look at origin
+        cv::Vec3d(0, -1, 0)   // Up vector
+    );
+    window.setViewerPose(camera_pose);
 
-    // // Start visualization
-    // window.spin();
+    // Start visualization
+    window.spin();
 
 
 
