@@ -23,9 +23,9 @@ Week 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
 
 Camera Pose Estimation: *(Aryan)*
 We’ll decompose the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair.*(done) (Aryan)*
-We’ll choose the correct pose by ensuring positive depth for the reconstructed points.*(done) (Aryan)* *(NOTE: chierality test passed only after normalizing and undistorting the images)*
-Output: Rotation and translation matrices for the initial pair. *(done)*
-Deliverables: We’ll document the selection process for the correct pose. *(later)*
+We’ll choose the correct pose by ensuring positive depth for the reconstructed points.*(done) (Aryan)* *(NOTE: chierality test passed only after undistorting and normalizing the images)*
+Output: Rotation and translation matrices for the initial pair. *(done) (Aryan)*
+Deliverables: We’ll document the selection process for the correct pose. *(later) (Aryan)*
 
 Triangulation: *(Manya)*
 We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras. *(Manya)*
@@ -44,7 +44,7 @@ Estimate the new camera pose using PnP (Perspective-n-Point) with RANSAC. Triang
 Output: Incremental 3D point cloud with more views added.
 Deliverables: Visualize step-by-step growth of the 3D model.
 
-Bundle Adjustment(on each increment perform bundle adjustment to refine the camera parameters and 3D points):
+Bundle Adjustment(on each incremwent perform bundle adjustment to refine the camera parameters and 3D points):
 We’ll implement or integrate a basic bundle adjustment using libraries like Ceres Solver or g2o to refine camera parameters and 3D points.
 Output: Optimized camera poses and 3D structure.
 Deliverables: We’ll show the before-and-after comparison of the point cloud.
