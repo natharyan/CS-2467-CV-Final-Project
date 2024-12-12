@@ -8,6 +8,7 @@
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
 #include "ransac.hpp"
+#include "triangulation.hpp"
 
 namespace fs = std::filesystem;
 
@@ -20,29 +21,49 @@ cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
 }
 
 // decompose the essential matrix to get the rotation matrix and translation vector between the initial image pair
-vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix){
+std::vector<std::pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix) {
     cv::Mat W, U, Vt;
 
-    // decompose the essential matrix to get the rotation matrix and translation vector
-    // essential matrix = U * diag(s, s, 0) * Vt where the diagonal matrix contains the singular values from the essential matrix
+    // Decompose the essential matrix to get the rotation matrix and translation vector
     cv::SVD svd(essential_matrix, cv::SVD::FULL_UV);
 
     W = (cv::Mat_<double>(3, 3) << 0, -1, 0, 1, 0, 0, 0, 0, 1);
     U = svd.u;
     Vt = svd.vt;
 
-    // generate candidate rotation matrices and the translation vector
+    // Ensure the determinants of U and Vt are positive
+    if (cv::determinant(U) < 0) {
+        U *= -1;
+    }
+    if (cv::determinant(Vt) < 0) {
+        Vt *= -1;
+    }
+
+    // Generate candidate rotation matrices and the translation vector
     cv::Mat R1 = U * W * Vt;
     cv::Mat R2 = U * W.t() * Vt;
-    // get the third column of the U matrix as the translation vector (up to scale)
+
+    // Ensure rotation matrices have determinant +1
+    if (cv::determinant(R1) < 0) {
+        R1 *= -1;
+    }
+    if (cv::determinant(R2) < 0) {
+        R2 *= -1;
+    }
+
+    // Get the third column of the U matrix as the translation vector (up to scale)
     cv::Mat t = U.col(2);
-    cout << "t: " << t << endl;
-    cout << "R1 determinant: " << cv::determinant(R1) << endl;
-    cout << "R2 determinant: " << cv::determinant(R2) << endl;
-    vector<pair<cv::Mat, cv::Mat>> candidates = {{R1, t}, {R2, t}, {R1, -t}, {R2, -t}};
+    std::cout << "t: " << t << std::endl;
+
+    std::cout << "R1 determinant: " << cv::determinant(R1) << std::endl;
+    std::cout << "R2 determinant: " << cv::determinant(R2) << std::endl;
+
+    // Return all four combinations of R and t
+    std::vector<std::pair<cv::Mat, cv::Mat>> candidates = {
+        {R1, t}, {R2, t}, {R1, -t}, {R2, -t}
+    };
     return candidates;
 }
-
 
 // get the camera intrinsics from calibration file
 pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
@@ -98,8 +119,35 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
     return {K, distortion_coefficients};
 }
 
+// normalize the points
+vector<cv::Point2f> normalizePoints(vector<cv::Point2f> points, cv::Mat K){
+    vector<cv::Point2f> normalized_points;
+    for(auto point : points){
+        cv::Point2f normalized_point;
+        normalized_point.x = (point.x - K.at<double>(0, 2)) / K.at<double>(0, 0);
+        normalized_point.y = (point.y - K.at<double>(1, 2)) / K.at<double>(1, 1);
+        normalized_points.push_back(normalized_point);
+    }
+    return normalized_points;
+}
+
+// denormalize the points
+std::vector<cv::Point3f> denormalizePoints(const std::vector<cv::Point3f>& points, const cv::Mat& K) {
+    std::vector<cv::Point3f> denormalized_points;
+    for (const auto& point : points) {
+        cv::Point3f denormalized_point;
+
+        // Denormalize using the intrinsic matrix K and scaling by Z
+        denormalized_point.x = point.x * point.z * K.at<double>(0, 0) + K.at<double>(0, 2) * point.z;
+        denormalized_point.y = point.y * point.z * K.at<double>(1, 1) + K.at<double>(1, 2) * point.z;
+        denormalized_point.z = point.z; // Z remains the depth
+
+        denormalized_points.push_back(denormalized_point);
+    }
+    return denormalized_points;
+}
+
 int main(){
-    // cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
     pair<string,string> initial_image_pair_paths;
@@ -160,16 +208,18 @@ int main(){
     // img1_undistorted = img1;
     // img2_undistorted = img2;
     // detect and compute the keypoints and descriptors
-    // orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
-    // orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
+    cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
+    orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
 
-    pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors1 = runORB(initial_image_pair_paths.first);
-    keypoints1 = keypoints_descriptors1.first;
-    descriptors1 = keypoints_descriptors1.second;
+    // TODO: uncomment this for Manya's orb implementation
+    // pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors1 = runORB(initial_image_pair_paths.first);
+    // keypoints1 = keypoints_descriptors1.first;
+    // descriptors1 = keypoints_descriptors1.second;
 
-    pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors2 = runORB(initial_image_pair_paths.second);
-    keypoints2 = keypoints_descriptors2.first;
-    descriptors2 = keypoints_descriptors2.second;
+    // pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors2 = runORB(initial_image_pair_paths.second);
+    // keypoints2 = keypoints_descriptors2.first;
+    // descriptors2 = keypoints_descriptors2.second;
 
     // use our BFMatcher to return the matched keypoints
     vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
@@ -186,6 +236,11 @@ int main(){
         matches2.push_back(match.second);
     }
 
+    // plot the matches
+    plotMatches(img1,img2,matches);
+
+    // cout << "number of matches: " << matches.size() << endl;
+
     cout << endl;
     // plot the epipolar lines and inliers for the initial image pair
     int num_inliers = 0;
@@ -201,24 +256,24 @@ int main(){
     }
 
     MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
-    cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+    cv::Mat fundamental_matrix_opencv = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
     // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
     // check if fundamental matrix is empty
     // cout << "fundamental matrix: " << fundamental_matrix << endl;
     // convert F (MatrixXd) to cv::Mat
-    cv::Mat F_cv(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
+    cv::Mat fundamental_matrix(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
 
     // Copy data from Eigen matrix to cv::Mat
     for (int i = 0; i < F.rows(); ++i) {
         for (int j = 0; j < F.cols(); ++j) {
-            F_cv.at<double>(i, j) = F(i, j);
+            fundamental_matrix.at<double>(i, j) = F(i, j);
         }
     }
     
-    cout << "fundamental matrix(opencv): " << endl << fundamental_matrix << endl;
-    cout << "fundamental matrix: " << endl << F_cv << endl;
+    cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
+    cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
     for(int k = 0; k < points1.size(); k++){
-        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
+        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix_opencv, points1[k], points2[k]);
         if(epipolar_constraint_satisfied){
             num_inliers += 1;
         }
@@ -229,33 +284,50 @@ int main(){
     }
     cout << endl;
 
-    vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
+    vector<bool> inliers_mask = getInliers(fundamental_matrix_opencv, points1, points2);
 
-    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix_opencv, inliers_mask);
 
-    cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
+    cv::Mat E = getEssentialMatrix(fundamental_matrix_opencv, K);
     cout << "Essential matrix: " << endl << E << endl;
     vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
 
     // Normalize points to image coordinates using K
-    std::vector<cv::Point2f> norm_points1, norm_points2;
-    for (const auto& pt : points1) {
-        float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
-        float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
-        norm_points1.emplace_back(x, y);
-    }
+    vector<cv::Point2f> norm_points1, norm_points2;
+    norm_points1 = normalizePoints(points1, K);
+    norm_points2 = normalizePoints(points2, K);
+    // for (const auto& pt : points1) {
+    //     float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
+    //     float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
+    //     norm_points1.emplace_back(x, y);
+    // }
 
-    for (const auto& pt : points2) {
-        float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
-        float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
-        norm_points2.emplace_back(x, y);
-    }
+    // for (const auto& pt : points2) {
+    //     float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
+    //     float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
+    //     norm_points2.emplace_back(x, y);
+    // }
 
     // use cheirality check to get the correct rotation and translation
     cv::Mat R, t;
-    vector<cv::Point3d> points3d;
+    vector<cv::Point3f> points3d;
     cv::Mat points4d;
     cv::Mat normalized_points4d;
+
+    // coordinate wise max difference in normalized points
+    double max_diff = 0;
+    for (int i = 0; i < norm_points1.size(); i++) {
+        double diff = cv::norm(norm_points1[i] - norm_points2[i]);
+        if (diff > max_diff) {
+            max_diff = diff;
+        }
+    }
+    cout << "Max difference in normalized points: " << max_diff << endl;
+
+    cout << "Matched points: " << endl;
+    for (int i = 0; i < points1.size(); i++) {
+        cout << "Point " << i << ": " << points1[i] << " " << points1[i] << endl;
+    }
 
     int counter = 0;
     for (pair<cv::Mat, cv::Mat> R_t : rotation_translationCandidates) {
@@ -268,18 +340,15 @@ int main(){
         cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
         cv::Mat Rt_combined;
         cv::hconcat(R_t.first, R_t.second, Rt_combined); // Combine R and t
+        // cout << "Rt_combined: " << endl << Rt_combined << endl;
         cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
-
+       
+        // cv::Mat RT = cv::Mat::zeros(3, 4, R.type()); // Create a 3x4 matrix
+        // R.copyTo(RT(cv::Rect(0, 0, 3, 3)));         // Copy R into the first 3 columns
+        // T.copyTo(RT(cv::Rect(3, 0, 1, 3)));         // Copy T into the last column
+        // cv::Mat P = K * RT;                         // Compute the projection matrix
         // triangulate points
-        // TODO: implement triangulation from scratch
-        cv::triangulatePoints(P1, P2, norm_points1, norm_points2, points4d);
-        points3d.clear();
-        for (int i = 0; i < points4d.cols; i++) {
-            cv::Mat point = points4d.col(i);
-            point /= point.at<double>(3, 0); // Normalize by w
-            points3d.emplace_back(point.at<double>(0, 0), point.at<double>(1, 0), point.at<double>(2, 0));
-            // cout << "3D point: " << points3d.back().x << " " << points3d.back().y << " " << points3d.back().z << endl;
-        }
+        points3d = triangulation(P1, P2, norm_points1, norm_points2);
 
         // check cheirality condition
         bool cheirality = true;
@@ -305,6 +374,13 @@ int main(){
     // 3d points
     for (int i = 0; i < points3d.size(); i++) {
         cout << "3D point " << i << ": " << points3d[i] << endl;
+    }
+
+    // denormalize the 3d points
+    points3d = denormalizePoints(points3d, K);
+    cout << "Denormalized 3D points: " << endl;
+    for (int i = 0; i < points3d.size(); i++) {
+            cout << "3D point " << i << ": " << points3d[i] << endl;
     }
     // Create Viz3d window
     cv::viz::Viz3d window("3D Points");

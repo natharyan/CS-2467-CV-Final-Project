@@ -15,6 +15,6 @@ int computeHammingDistance(const cv::Mat& desc1, const cv::Mat& desc2, int idx1,
 //get the keypoint matches
 vector<pair<cv::KeyPoint, cv::KeyPoint>> getMatches_Keypoints(const cv::Mat& descriptors1, const cv::Mat& descriptors2, const vector<cv::KeyPoint> keypoints1, const vector<cv::KeyPoint> keypoints2, const float ratio);
 
-void plotMatches(const cv::Mat& img1, const cv::Mat& img2, const vector<cv::KeyPoint>& keypoints1, const vector<cv::KeyPoint>& keypoints2, const vector<pair<int, int>>& matches);
+void plotMatches(const cv::Mat& img1, const cv::Mat& img2, const vector<pair<cv::KeyPoint, cv::KeyPoint>>& matches);
 
 #endif // BFMACTHER_H

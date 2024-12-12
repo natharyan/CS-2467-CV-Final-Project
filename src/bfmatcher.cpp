@@ -55,9 +55,14 @@ vector<pair<cv::KeyPoint, cv::KeyPoint>> getMatches_Keypoints(const cv::Mat& des
 }
 
 // Plot matches between two images
-void plotMatches(const cv::Mat& img1, const cv::Mat& img2, const vector<cv::KeyPoint>& keypoints1, const vector<cv::KeyPoint>& keypoints2, 
-                 const vector<pair<cv::KeyPoint, cv::KeyPoint>>& matches) {
+void plotMatches(const cv::Mat& img1, const cv::Mat& img2, const vector<pair<cv::KeyPoint, cv::KeyPoint>>& matches) {
     cv::Mat img1_color, img2_color;
+    // get the keypoints from the matches
+    vector<cv::KeyPoint> keypoints1, keypoints2;
+    for (const auto& match : matches) {
+        keypoints1.push_back(match.first);
+        keypoints2.push_back(match.second);
+    }
     cv::cvtColor(img1, img1_color, cv::COLOR_GRAY2BGR);
     cv::cvtColor(img2, img2_color, cv::COLOR_GRAY2BGR);
 

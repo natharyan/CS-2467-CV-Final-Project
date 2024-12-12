@@ -35,8 +35,6 @@ Triangulation: *(Manya)*
 
 #########################################################################################
 
-(post 10th for Aryan)
-
 Week 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
 
 Incremental Image Addition:
