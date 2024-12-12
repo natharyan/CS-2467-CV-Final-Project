@@ -184,14 +184,6 @@ int main(){
         matches2.push_back(match.second);
     }
 
-    // plot the keypoints
-    cv::Mat img1_keypoints, img2_keypoints;
-    cv::drawKeypoints(img1, matches1, img1_keypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-    cv::drawKeypoints(img2, matches2, img2_keypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-    cv::imshow("img1 keypoints", img1_keypoints);
-    cv::imshow("img2 keypoints", img2_keypoints);
-    cv::waitKey(0);
-
     cout << endl;
     // plot the epipolar lines and inliers for the initial image pair
     int num_inliers = 0;

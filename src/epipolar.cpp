@@ -73,11 +73,11 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     //     cout << "Descriptor " << i << ": " << descriptors[i] << endl;
     // }
     cout << descriptors.size() << endl;
-    cout << "done" << endl;
-    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
-    // Show the image with keypoints
-    cv::imshow("Keypoints", imgWithKeypoints);
-    cv::waitKey(1);
+    // cout << "done" << endl;
+    // drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
+    // // Show the image with keypoints
+    // cv::imshow("Keypoints", imgWithKeypoints);
+    // cv::waitKey(1);
     cout << "done" << endl;
     // Print the descriptors
     // cout << "Descriptors (first 5 descriptors):" << endl;
@@ -187,8 +187,11 @@ pair<string,string> initial_image_pair(vector<string> images){
             cout << "number of points: " << points2.size() << endl;
             // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
+                // TODO: add fundamental matrix estimation using our ransac
                 cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
+                // check if fundamental matrix is empty
+                cout << "fundamental matrix: " << fundamental_matrix << endl;
                 for(int k = 0; k < points1.size(); k++){
                     bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
                     if(epipolar_constraint_satisfied){
