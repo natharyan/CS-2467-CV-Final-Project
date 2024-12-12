@@ -187,90 +187,92 @@ vector<Mat> rBRIEF(const Mat& image, const vector<Point>& keypoints, int patchSi
 }
 
 
+
+
 struct KeypointWithResponse {
     Point point;
     double harrisResponse;
 };
 
-int main(){
-    string imgpath = "../../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg";
-    cv::Mat baseImage;
-    baseImage = createBaseImage(imgpath);
-    cout << "SIFT running..." << endl;
-    cv::imshow("Base Image", baseImage);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
-    // calling FAST9 
-    cout << "running" << endl;
-    vector<Point> initialKeypoints = FAST9(baseImage, 20);
-    cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
+// int main(){
+//     string imgpath = "../../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg";
+//     cv::Mat baseImage;
+//     baseImage = createBaseImage(imgpath);
+//     cout << "SIFT running..." << endl;
+//     cv::imshow("Base Image", baseImage);
+//     cv::waitKey(0);
+//     cv::destroyAllWindows();
+//     // calling FAST9 
+//     cout << "running" << endl;
+//     vector<Point> initialKeypoints = FAST9(baseImage, 20);
+//     cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
 
-    // harris corner response 
-    vector<KeypointWithResponse> keypointsWithResponses;
-    for (const Point& kp : initialKeypoints) {
-        double response = harrisResponse(baseImage, kp);
-        // Retain only the keypoints with a Harris response greater than 0.01
-        if (response > 0.01) { 
-            keypointsWithResponses.push_back({kp, response});
-        }
-    }
+//     // harris corner response 
+//     vector<KeypointWithResponse> keypointsWithResponses;
+//     for (const Point& kp : initialKeypoints) {
+//         double response = harrisResponse(baseImage, kp);
+//         // Retain only the keypoints with a Harris response greater than 0.01
+//         if (response > 0.01) { 
+//             keypointsWithResponses.push_back({kp, response});
+//         }
+//     }
 
-    // Sort the keypoints based on Harris response
-    sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
-        return a.harrisResponse > b.harrisResponse;
-    });
+//     // Sort the keypoints based on Harris response
+//     sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
+//         return a.harrisResponse > b.harrisResponse;
+//     });
 
-    // Retain only the top N keypoints
-    const int maxKeypoints = 500;
-    if (keypointsWithResponses.size() > maxKeypoints) {
-        keypointsWithResponses.resize(maxKeypoints);
-    }
+//     // Retain only the top N keypoints
+//     const int maxKeypoints = 500;
+//     if (keypointsWithResponses.size() > maxKeypoints) {
+//         keypointsWithResponses.resize(maxKeypoints);
+//     }
 
-    cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
+//     cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
 
-    // Extract the keypoints and compute orientations
-    vector<Point> filteredKeypoints;
-    vector<double> orientations;
-    for (const auto& kpWithResponse : keypointsWithResponses) {
-        filteredKeypoints.push_back(kpWithResponse.point);
-        orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
-    }
-    cout << filteredKeypoints << endl; 
+//     // Extract the keypoints and compute orientations
+//     vector<Point> filteredKeypoints;
+//     vector<double> orientations;
+//     for (const auto& kpWithResponse : keypointsWithResponses) {
+//         filteredKeypoints.push_back(kpWithResponse.point);
+//         orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
+//     }
+//     cout << filteredKeypoints << endl; 
 
-    vector<KeyPoint> cvKeypoints;
-    for (const auto& point : filteredKeypoints) {
-        KeyPoint kp(point.x, point.y, 31); // Set patch size (31 as example)
-        cvKeypoints.push_back(kp);
-    }
+//     vector<KeyPoint> cvKeypoints;
+//     for (const auto& point : filteredKeypoints) {
+//         KeyPoint kp(point.x, point.y, 31); // Set patch size (31 as example)
+//         cvKeypoints.push_back(kp);
+//     }
 
-    // Compute rBRIEF descriptors
-    vector<Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
-    cout << "Descriptors computed using rBRIEF." << endl;
+//     // Compute rBRIEF descriptors
+//     vector<Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
+//     cout << "Descriptors computed using rBRIEF." << endl;
 
-    // Visualize the keypoints
-    cv::Mat displayImage;
-    cvtColor(baseImage, displayImage, COLOR_GRAY2BGR);  
+//     // Visualize the keypoints
+//     cv::Mat displayImage;
+//     cvtColor(baseImage, displayImage, COLOR_GRAY2BGR);  
 
-    // Display keypoints on the image
-    Mat imgWithKeypoints;
-    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, Scalar(0, 255, 0), DrawMatchesFlags::DEFAULT);
+//     // Display keypoints on the image
+//     Mat imgWithKeypoints;
+//     drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, Scalar(0, 255, 0), DrawMatchesFlags::DEFAULT);
 
-    // Show the image with keypoints
-    imshow("Keypoints", imgWithKeypoints);
-    waitKey(0);
+//     // Show the image with keypoints
+//     imshow("Keypoints", imgWithKeypoints);
+//     waitKey(0);
 
-    // Print the descriptors
-    cout << "Descriptors (first 5 descriptors):" << endl;
-    for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
-        cout << "Descriptor " << i << ": " << descriptors[i] << endl;
-    }
-    // cout << descriptors.size() << endl;
-    // cout << "done" << endl;
+//     // Print the descriptors
+//     cout << "Descriptors (first 5 descriptors):" << endl;
+//     for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
+//         cout << "Descriptor " << i << ": " << descriptors[i] << endl;
+//     }
+//     // cout << descriptors.size() << endl;
+//     // cout << "done" << endl;
 
-    imshow("Filtered Keypoints with Orientations", displayImage);
-    waitKey(0);
-    destroyAllWindows();
+//     imshow("Filtered Keypoints with Orientations", displayImage);
+//     waitKey(0);
+//     destroyAllWindows();
 
-    cout << "ORB pipeline completed successfully." << endl;
-    return 0;
-}
+//     cout << "ORB pipeline completed successfully." << endl;
+//     return 0;
+// }

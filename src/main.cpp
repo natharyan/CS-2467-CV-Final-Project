@@ -6,6 +6,8 @@
 #include <fstream>
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
+#include "orb.hpp"
+
 
 namespace fs = std::filesystem;
 
@@ -97,8 +99,89 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
 
 
 
-
 int main(){
+
+    string imgpath = "../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg";
+    cv::Mat baseImage;
+    baseImage = createBaseImage(imgpath);
+    cout << "SIFT running..." << endl;
+    cv::imshow("Base Image", baseImage);
+    cv::waitKey(0);
+    cv::destroyAllWindows();
+    // calling FAST9 
+    cout << "running" << endl;
+    vector<cv::Point> initialKeypoints = FAST9(baseImage, 20);
+    cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
+
+    // harris corner response 
+    vector<KeypointWithResponse> keypointsWithResponses;
+    for (const cv::Point& kp : initialKeypoints) {
+        double response = harrisResponse(baseImage, kp);
+        // Retain only the keypoints with a Harris response greater than 0.01
+        if (response > 0.01) { 
+            keypointsWithResponses.push_back({kp, response});
+        }
+    }
+
+    // Sort the keypoints based on Harris response
+    sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
+        return a.harrisResponse > b.harrisResponse;
+    });
+
+    // Retain only the top N keypoints
+    const int maxKeypoints = 500;
+    if (keypointsWithResponses.size() > maxKeypoints) {
+        keypointsWithResponses.resize(maxKeypoints);
+    }
+
+    cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
+
+    // Extract the keypoints and compute orientations
+    vector<cv::Point> filteredKeypoints;
+    vector<double> orientations;
+    for (const auto& kpWithResponse : keypointsWithResponses) {
+        filteredKeypoints.push_back(kpWithResponse.point);
+        orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
+    }
+    cout << filteredKeypoints << endl; 
+
+    vector<cv::KeyPoint> cvKeypoints;
+    for (const auto& point : filteredKeypoints) {
+        cv::KeyPoint kp(point.x, point.y, 31); // Set patch size (31 as example)
+        cvKeypoints.push_back(kp);
+    }
+
+    // Compute rBRIEF descriptors
+    vector<cv::Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
+    cout << "Descriptors computed using rBRIEF." << endl;
+
+    // Visualize the keypoints
+    cv::Mat displayImage;
+    cvtColor(baseImage, displayImage, cv::COLOR_GRAY2BGR);  
+
+    // Display keypoints on the image
+    cv::Mat imgWithKeypoints;
+    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
+
+    // Show the image with keypoints
+    cv::imshow("Keypoints", imgWithKeypoints);
+    cv::waitKey(0);
+
+    // Print the descriptors
+    cout << "Descriptors (first 5 descriptors):" << endl;
+    for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
+        cout << "Descriptor " << i << ": " << descriptors[i] << endl;
+    }
+    // cout << descriptors.size() << endl;
+    // cout << "done" << endl;
+
+    cv::imshow("Filtered Keypoints with Orientations", displayImage);
+    cv::waitKey(0);
+    cv::destroyAllWindows();
+
+    cout << "ORB pipeline completed successfully." << endl;
+    return 0;
+    
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
