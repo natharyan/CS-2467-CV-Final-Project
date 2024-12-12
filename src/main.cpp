@@ -6,13 +6,10 @@
 #include <fstream>
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
-#include "orb.hpp"
-
 
 namespace fs = std::filesystem;
 
 using namespace std;
-
 
 // get the essential matrix from the fundamental matrix
 cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
@@ -21,7 +18,6 @@ cv::Mat getEssentialMatrix(cv::Mat fundamental_matrix, cv::Mat K){
 }
 
 // decompose the essential matrix to get the rotation matrix and translation vector between the initial image pair
-
 vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix){
     cv::Mat W, U, Vt;
 
@@ -38,6 +34,9 @@ vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix){
     cv::Mat R2 = U * W.t() * Vt;
     // get the third column of the U matrix as the translation vector (up to scale)
     cv::Mat t = U.col(2);
+    cout << "t: " << t << endl;
+    cout << "R1 determinant: " << cv::determinant(R1) << endl;
+    cout << "R2 determinant: " << cv::determinant(R2) << endl;
     vector<pair<cv::Mat, cv::Mat>> candidates = {{R1, t}, {R2, t}, {R1, -t}, {R2, -t}};
     return candidates;
 }
@@ -97,99 +96,28 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
     return {K, distortion_coefficients};
 }
 
-
-
 int main(){
-
-    string imgpath = "../dataset/Book Statue/WhatsApp Image 2024-11-25 at 19.01.18 (1).jpeg";
-    cv::Mat baseImage;
-    baseImage = createBaseImage(imgpath);
-    cout << "SIFT running..." << endl;
-    cv::imshow("Base Image", baseImage);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
-    // calling FAST9 
-    cout << "running" << endl;
-    vector<cv::Point> initialKeypoints = FAST9(baseImage, 20);
-    cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
-
-    // harris corner response 
-    vector<KeypointWithResponse> keypointsWithResponses;
-    for (const cv::Point& kp : initialKeypoints) {
-        double response = harrisResponse(baseImage, kp);
-        // Retain only the keypoints with a Harris response greater than 0.01
-        if (response > 0.01) { 
-            keypointsWithResponses.push_back({kp, response});
-        }
-    }
-
-    // Sort the keypoints based on Harris response
-    sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
-        return a.harrisResponse > b.harrisResponse;
-    });
-
-    // Retain only the top N keypoints
-    const int maxKeypoints = 500;
-    if (keypointsWithResponses.size() > maxKeypoints) {
-        keypointsWithResponses.resize(maxKeypoints);
-    }
-
-    cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
-
-    // Extract the keypoints and compute orientations
-    vector<cv::Point> filteredKeypoints;
-    vector<double> orientations;
-    for (const auto& kpWithResponse : keypointsWithResponses) {
-        filteredKeypoints.push_back(kpWithResponse.point);
-        orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
-    }
-    cout << filteredKeypoints << endl; 
-
-    vector<cv::KeyPoint> cvKeypoints;
-    for (const auto& point : filteredKeypoints) {
-        cv::KeyPoint kp(point.x, point.y, 31); // Set patch size (31 as example)
-        cvKeypoints.push_back(kp);
-    }
-
-    // Compute rBRIEF descriptors
-    vector<cv::Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
-    cout << "Descriptors computed using rBRIEF." << endl;
-
-    // Visualize the keypoints
-    cv::Mat displayImage;
-    cvtColor(baseImage, displayImage, cv::COLOR_GRAY2BGR);  
-
-    // Display keypoints on the image
-    cv::Mat imgWithKeypoints;
-    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
-
-    // Show the image with keypoints
-    cv::imshow("Keypoints", imgWithKeypoints);
-    cv::waitKey(0);
-
-    // Print the descriptors
-    cout << "Descriptors (first 5 descriptors):" << endl;
-    for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
-        cout << "Descriptor " << i << ": " << descriptors[i] << endl;
-    }
-    // cout << descriptors.size() << endl;
-    // cout << "done" << endl;
-
-    cv::imshow("Filtered Keypoints with Orientations", displayImage);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
-
-    cout << "ORB pipeline completed successfully." << endl;
-    return 0;
-    
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
     pair<string,string> initial_image_pair_paths;
     bool FLAG_initial_image_pair = true; // set to true if the initial image pair is provided
 
+    // get the camera intrinsics from calibration file
+    // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)
+    // pair<cv::Mat,cv::Mat> intrinsics = getCameraIntrinsics();
+    // cv::Mat K = intrinsics.first;
+    // cv::Mat distortion_coefficients = intrinsics.second;
+    // cout << "Camera intrinsics: " << endl << K << endl;
+    // cout << "Distortion coefficients: " << endl << distortion_coefficients << endl;
+
+    //K = [[3.04690978e+03 0.00000000e+00 1.58798925e+03] [0.00000000e+00 3.04241561e+03 1.52143054e+03] [0.00000000e+00 0.00000000e+00 1.00000000e+00]]
+    // distortion_coefficients = [[ 3.92176156e-02 -4.71862125e-01  1.37646274e-03  4.51593168e-04 1.81876525e+00]]
+    cv::Mat K = (cv::Mat_<double>(3, 3) << 3.04690978e+03, 0.00000000e+00, 1.58798925e+03, 0.00000000e+00, 3.04241561e+03, 1.52143054e+03, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
+    cv::Mat distortion_coefficients = (cv::Mat_<double>(1, 5) << 3.92176156e-02, -4.71862125e-01, 1.37646274e-03, 4.51593168e-04, 1.81876525e+00);
+
     // check if initial_image_pair.txt exists read the initial image pair from the file
-    if(FLAG_initial_image_pair){ 
+    if(FLAG_initial_image_pair){
         if(fs::exists("static/initial_image_pair.txt")){
             ifstream initial_image_pair_file("static/initial_image_pair.txt");
             string img1_path, img2_path;
@@ -203,7 +131,7 @@ int main(){
             FLAG_initial_image_pair = false;
         }
     }else{
-        string img_path = "dataset/maingate_statue/";
+        string img_path = "dataset/water_canon/";
         vector<string> images;
 
         for (const auto & entry : fs::directory_iterator(img_path))
@@ -222,8 +150,13 @@ int main(){
 
     cv::Mat img1 = cv::imread(initial_image_pair_paths.first, cv::IMREAD_GRAYSCALE);
     cv::Mat img2 = cv::imread(initial_image_pair_paths.second, cv::IMREAD_GRAYSCALE);
-    orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
-    orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
+    // undistort the images
+    cv::Mat img1_undistorted, img2_undistorted;
+    cv::undistort(img1, img1_undistorted, K, distortion_coefficients);
+    cv::undistort(img2, img2_undistorted, K, distortion_coefficients);
+    // detect and compute the keypoints and descriptors
+    orb->detectAndCompute(img1_undistorted, cv::noArray(), keypoints1, descriptors1);
+    orb->detectAndCompute(img2_undistorted, cv::noArray(), keypoints2, descriptors2);
     // use our BFMatcher to return the matched keypoints
     vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
     vector<cv::Point2f> points1, points2;
@@ -233,25 +166,6 @@ int main(){
         points2.push_back(match.second.pt);
     }
 
-    // get the camera intrinsics from calibration file
-    // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)
-    // pair<cv::Mat,cv::Mat> intrinsics = getCameraIntrinsics();
-    // cv::Mat K = intrinsics.first;
-    // cv::Mat distortion_coefficients = intrinsics.second;
-    // cout << "Camera intrinsics: " << endl << K << endl;
-    // cout << "Distortion coefficients: " << endl << distortion_coefficients << endl;
-
-    //K = [[3.04690978e+03 0.00000000e+00 1.58798925e+03] [0.00000000e+00 3.04241561e+03 1.52143054e+03] [0.00000000e+00 0.00000000e+00 1.00000000e+00]]
-    // distortion_coefficients = [[ 3.92176156e-02 -4.71862125e-01  1.37646274e-03  4.51593168e-04 1.81876525e+00]]
-    cv::Mat K = (cv::Mat_<double>(3, 3) << 3.04690978e+03, 0.00000000e+00, 1.58798925e+03, 0.00000000e+00, 3.04241561e+03, 1.52143054e+03, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
-    cv::Mat distortion_coefficients = (cv::Mat_<double>(1, 5) << 3.92176156e-02, -4.71862125e-01, 1.37646274e-03, 4.51593168e-04, 1.81876525e+00);
-
-    // undistort and normalize points
-    vector<cv::Point2f> normalized_points1, normalized_points2;
-    cv::undistortPoints(points1, normalized_points1, K, distortion_coefficients);
-    cv::undistortPoints(points2, normalized_points2, K, distortion_coefficients);
-    // points1 = normalized_points1;
-    // points2 = normalized_points2;
     cout << endl;
     // plot the epipolar lines and inliers for the initial image pair
     int num_inliers = 0;
@@ -272,18 +186,39 @@ int main(){
 
     vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
-    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
+    plotEpipolarLinesAndInliers(img1_undistorted, img2_undistorted, points1, points2, fundamental_matrix, inliers_mask);
 
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
+    cout << "Essential matrix: " << endl << E << endl;
     vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
+
+    // Normalize points to image coordinates using K
+    std::vector<cv::Point2f> norm_points1, norm_points2;
+    for (const auto& pt : points1) {
+        float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
+        float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
+        norm_points1.emplace_back(x, y);
+    }
+
+    for (const auto& pt : points2) {
+        float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
+        float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
+        norm_points2.emplace_back(x, y);
+    }
 
     // use cheirality check to get the correct rotation and translation
     cv::Mat R, t;
+    vector<cv::Point3d> points3d;
+    cv::Mat points4d;
+    cv::Mat normalized_points4d;
+
     int counter = 0;
     for (pair<cv::Mat, cv::Mat> R_t : rotation_translationCandidates) {
-        // normalize the translation vector
-        R_t.second /= cv::norm(R_t.second);
-
+        // normalize the translation vector 
+        // TODO: check if this is necessary
+        // R_t.second /= cv::norm(R_t.second);
+        // cout << "Rotation matrix candidate " << counter << ": " << endl << R_t.first << endl;
+        // cout << "Translation vector candidate " << counter << ": " << endl << R_t.second << endl;
         // construct projection matrices
         cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
         cv::Mat Rt_combined;
@@ -291,21 +226,20 @@ int main(){
         cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
 
         // triangulate points
-        vector<cv::Point3d> points3d;
-        cv::Mat points4d;
         // TODO: implement triangulation from scratch
-        cv::triangulatePoints(P1, P2, normalized_points1, normalized_points2, points4d);
-
+        cv::triangulatePoints(P1, P2, norm_points1, norm_points2, points4d);
+        points3d.clear();
         for (int i = 0; i < points4d.cols; i++) {
-            cv::Mat point4d = points4d.col(i);
-            point4d /= point4d.at<double>(3, 0); // Normalize homogeneous coordinates
-            points3d.push_back(cv::Point3d(point4d.at<double>(0, 0), point4d.at<double>(1, 0), point4d.at<double>(2, 0)));
+            cv::Mat point = points4d.col(i);
+            point /= point.at<double>(3, 0); // Normalize by w
+            points3d.emplace_back(point.at<double>(0, 0), point.at<double>(1, 0), point.at<double>(2, 0));
+            cout << "3D point: " << points3d.back().x << " " << points3d.back().y << " " << points3d.back().z << endl;
         }
 
         // check cheirality condition
         bool cheirality = true;
         for (cv::Point3d point3d : points3d) {
-            if (point3d.z < -1e-6) { // Allow small tolerance for numerical errors
+            if (point3d.z < 0) {
                 cheirality = false;
                 break;
             }
@@ -320,9 +254,32 @@ int main(){
     }
 
     cout << "Rotation matrix: " << endl << R << endl;
-    cout << "Translation vector: " << endl << t << endl;
+    cout << "Translation vector: " << endl << t*cv::norm(t) << endl;
+
+    cout << "3d point: " << points3d.size() << endl;
+    cout << "3d point: " << points3d[0].x << " " << points3d[0].y << " " << points3d[0].z << endl;
+    // Create Viz3d window
+    cv::viz::Viz3d window("3D Points");
+    window.setWindowSize(cv::Size(1500, 1500));
+    window.setWindowPosition(cv::Point(150, 150));
+    window.setBackgroundColor(cv::viz::Color::black());
+
+    // Add point cloud widget
+    cv::viz::WCloud cloud_widget(points3d, cv::viz::Color::white());
+    cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 20.0); // Set point size
+    window.showWidget("point_cloud", cloud_widget);
+
+    // Set camera pose
+    cv::Affine3d camera_pose = cv::viz::makeCameraPose(
+        cv::Vec3d(0, 0, -5), // Camera position
+        cv::Vec3d(0, 0, 0),  // Look at origin
+        cv::Vec3d(0, -1, 0)  // Up vector
+    );
+    window.setViewerPose(camera_pose);
+
+    // Start visualization
+    window.spin();
 
     return 0;
 }
-// TODO: Add normalization and undistortion before plotting the epipolar lines and inliers
 // TODO: implement undistortion from scratch?

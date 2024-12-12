@@ -1,2 +1,2 @@
-dataset/maingate_statue/2.jpg
-dataset/maingate_statue/1.jpg
+dataset/water_canon/5.jpg
+dataset/water_canon/6.jpg

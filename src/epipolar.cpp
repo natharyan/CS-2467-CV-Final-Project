@@ -65,18 +65,18 @@ pair<string,string> initial_image_pair(vector<string> images){
     int max_inliers = 0;
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
-
+    
     for(int i = 0; i < images.size()-1; i++){
         cv::Mat img1 = cv::imread(images[i], cv::IMREAD_GRAYSCALE);
         for(int j = i+1; j < images.size(); j++){
             int num_inliers = 0;
             cv::Mat img2 = cv::imread(images[j], cv::IMREAD_GRAYSCALE);
-            // cout << images[i] << endl;
-            // cout << images[j] << endl;
+            cout << images[i] << endl;
+            cout << images[j] << endl;
             orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
             orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
             vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
-            // cout << "number of matches: " << matches.size() << endl;
+            cout << "number of matches: " << matches.size() << endl;
             // plotMatches(img1, img2, keypoints1, keypoints2, matches);
 
             vector<cv::Point2f> points1, points2;
