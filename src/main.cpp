@@ -4,8 +4,10 @@
 #include <filesystem>
 #include <vector>
 #include <fstream>
+#include <algorithm>
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
+#include "ransac.hpp"
 
 namespace fs = std::filesystem;
 
@@ -101,7 +103,7 @@ int main(){
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
     pair<string,string> initial_image_pair_paths;
-    bool FLAG_initial_image_pair = false; // set to true if the initial image pair is provided
+    bool FLAG_initial_image_pair = true; // set to true if the initial image pair is provided
 
     // get the camera intrinsics from calibration file
     // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)
@@ -131,7 +133,7 @@ int main(){
             FLAG_initial_image_pair = false;
         }
     }else{
-        string img_path = "dataset/water_canon/";
+        string img_path = "dataset/Book Statue";
         vector<string> images;
 
         for (const auto & entry : fs::directory_iterator(img_path))
@@ -188,8 +190,33 @@ int main(){
     // plot the epipolar lines and inliers for the initial image pair
     int num_inliers = 0;
     // TODO: implement fundamental matrix using ransac from scratch
+    int maxIterations = 1000;
+    double threshold = 0.01;
+
+    vector<pair<Eigen::Vector2d, Eigen::Vector2d>> eigen_matches;
+    for (const auto& match : matches) {
+        Eigen::Vector2d pt1(match.first.pt.x, match.first.pt.y);
+        Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
+        eigen_matches.emplace_back(pt1, pt2);
+    }
+
+    MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
     cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
-    cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
+    // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
+    // check if fundamental matrix is empty
+    // cout << "fundamental matrix: " << fundamental_matrix << endl;
+    // convert F (MatrixXd) to cv::Mat
+    cv::Mat F_cv(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
+
+    // Copy data from Eigen matrix to cv::Mat
+    for (int i = 0; i < F.rows(); ++i) {
+        for (int j = 0; j < F.cols(); ++j) {
+            F_cv.at<double>(i, j) = F(i, j);
+        }
+    }
+    
+    cout << "fundamental matrix(opencv): " << endl << fundamental_matrix << endl;
+    cout << "fundamental matrix: " << endl << F_cv << endl;
     for(int k = 0; k < points1.size(); k++){
         bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
         if(epipolar_constraint_satisfied){

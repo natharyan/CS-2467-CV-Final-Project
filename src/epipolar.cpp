@@ -8,6 +8,13 @@
 #include "epipolar.hpp"
 #include "orb.hpp"
 #include "ransac.hpp"
+#include <Eigen/Dense>
+
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
+using Eigen::JacobiSVD;
+using Eigen::ComputeFullU;
+using Eigen::ComputeFullV;
 
 using namespace std;
 
@@ -189,7 +196,7 @@ pair<string,string> initial_image_pair(vector<string> images){
             // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
                 // TODO: add fundamental matrix estimation using our ransac
-                cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+                // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 int maxIterations = 1000;
                 double threshold = 0.01;
 
@@ -201,13 +208,12 @@ pair<string,string> initial_image_pair(vector<string> images){
                 }
                 MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
 
-                cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+                // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 cout << "fundamental Matrix: " << endl << F << endl;
                 // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
                 // check if fundamental matrix is empty
                 // cout << "fundamental matrix: " << fundamental_matrix << endl;
                 // convert F (MatrixXd) to cv::Mat
-                cv::Mat F_cv;
                 cv::Mat F_cv(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
 
                 // Copy data from Eigen matrix to cv::Mat
@@ -218,11 +224,11 @@ pair<string,string> initial_image_pair(vector<string> images){
                 }
 
                 
-                if(fundamental_matrix.empty()){
+                if(F.size() == 0){
                     continue;
                 }
                 for(int k = 0; k < points1.size(); k++){
-                    bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
+                    bool epipolar_constraint_satisfied = epipolar_contraint(F_cv, points1[k], points2[k]);
                     if(epipolar_constraint_satisfied){
                         num_inliers += 1;
                     }

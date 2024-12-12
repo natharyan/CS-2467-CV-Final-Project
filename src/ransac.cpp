@@ -83,28 +83,3 @@ MatrixXd ransacFundamentalMatrix(const std::vector<std::pair<Eigen::Vector2d, Ei
 
     return bestF;
 }
-
-int main() {
-    // Example matches: pairs of corresponding points in two images
-    std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>> matches = {
-        {{100, 150}, {110, 160}},
-        {{200, 250}, {210, 260}},
-        {{300, 350}, {310, 360}},
-        {{400, 450}, {410, 460}},
-        {{500, 550}, {510, 560}},
-        {{600, 650}, {610, 660}},
-        {{700, 750}, {710, 760}},
-        {{800, 850}, {810, 860}},
-        {{900, 950}, {910, 960}},
-        {{1000, 1050}, {1010, 1060}}
-    };
-
-    int maxIterations = 1000;
-    double threshold = 0.01;
-
-    MatrixXd F = ransacFundamentalMatrix(matches, maxIterations, threshold);
-
-    std::cout << "Estimated Fundamental Matrix:\n" << F << std::endl;
-
-    return 0;
-}

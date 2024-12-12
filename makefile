@@ -5,12 +5,12 @@ CXX = g++
 CXXFLAGS = -std=c++17 -I/opt/homebrew/Cellar/opencv/4.10.0_12/include/opencv4
 
 # Linker flags
-LDFLAGS = -L/opt/homebrew/Cellar/opencv/4.10.0_12/lib -lopencv_core -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_features2d -lopencv_calib3d -lopencv_viz -lopencv_xfeatures2d
+LDFLAGS = -L/opt/homebrew/Cellar/opencv/4.10.0_12/lib -I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3/ -lopencv_core -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_features2d -lopencv_calib3d -lopencv_viz -lopencv_xfeatures2d
 
 # Target executable
 TARGET = bin/app
 
-SRC = src/main.cpp src/bfmatcher.cpp src/epipolar.cpp src/orb.cpp
+SRC = src/main.cpp src/bfmatcher.cpp src/epipolar.cpp src/orb.cpp src/ransac.cpp
 
 # Build target
 all: $(TARGET)
