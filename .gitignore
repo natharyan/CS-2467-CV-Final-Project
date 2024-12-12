@@ -4,3 +4,4 @@ notes.txt
 proposal.md
 .DS_Store
 venv/
+src/test.cpp

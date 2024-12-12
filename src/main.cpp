@@ -154,9 +154,12 @@ int main(){
     cv::Mat img1_undistorted, img2_undistorted;
     cv::undistort(img1, img1_undistorted, K, distortion_coefficients);
     cv::undistort(img2, img2_undistorted, K, distortion_coefficients);
+    // TODO: getting rotation matrix determinant as 1 when I'm using images without undistortion
+    // img1_undistorted = img1;
+    // img2_undistorted = img2;
     // detect and compute the keypoints and descriptors
-    orb->detectAndCompute(img1_undistorted, cv::noArray(), keypoints1, descriptors1);
-    orb->detectAndCompute(img2_undistorted, cv::noArray(), keypoints2, descriptors2);
+    orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
+    orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
     // use our BFMatcher to return the matched keypoints
     vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
     vector<cv::Point2f> points1, points2;
@@ -165,6 +168,20 @@ int main(){
         points1.push_back(match.first.pt);
         points2.push_back(match.second.pt);
     }
+
+    vector<cv::KeyPoint> matches1, matches2;
+    for(auto match : matches){
+        matches1.push_back(match.first);
+        matches2.push_back(match.second);
+    }
+
+    // plot the keypoints
+    cv::Mat img1_keypoints, img2_keypoints;
+    cv::drawKeypoints(img1, matches1, img1_keypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    cv::drawKeypoints(img2, matches2, img2_keypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    cv::imshow("img1 keypoints", img1_keypoints);
+    cv::imshow("img2 keypoints", img2_keypoints);
+    cv::waitKey(0);
 
     cout << endl;
     // plot the epipolar lines and inliers for the initial image pair
@@ -186,7 +203,7 @@ int main(){
 
     vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
-    plotEpipolarLinesAndInliers(img1_undistorted, img2_undistorted, points1, points2, fundamental_matrix, inliers_mask);
+    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
 
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
     cout << "Essential matrix: " << endl << E << endl;
@@ -233,7 +250,7 @@ int main(){
             cv::Mat point = points4d.col(i);
             point /= point.at<double>(3, 0); // Normalize by w
             points3d.emplace_back(point.at<double>(0, 0), point.at<double>(1, 0), point.at<double>(2, 0));
-            cout << "3D point: " << points3d.back().x << " " << points3d.back().y << " " << points3d.back().z << endl;
+            // cout << "3D point: " << points3d.back().x << " " << points3d.back().y << " " << points3d.back().z << endl;
         }
 
         // check cheirality condition
@@ -256,8 +273,11 @@ int main(){
     cout << "Rotation matrix: " << endl << R << endl;
     cout << "Translation vector: " << endl << t*cv::norm(t) << endl;
 
-    cout << "3d point: " << points3d.size() << endl;
-    cout << "3d point: " << points3d[0].x << " " << points3d[0].y << " " << points3d[0].z << endl;
+    cout << "3d points: " << points3d.size() << endl;
+    // 3d points
+    for (int i = 0; i < points3d.size(); i++) {
+        cout << "3D point " << i << ": " << points3d[i] << endl;
+    }
     // Create Viz3d window
     cv::viz::Viz3d window("3D Points");
     window.setWindowSize(cv::Size(1500, 1500));

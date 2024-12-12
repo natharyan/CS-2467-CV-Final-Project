@@ -65,7 +65,7 @@ pair<string,string> initial_image_pair(vector<string> images){
     int max_inliers = 0;
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
-    
+
     for(int i = 0; i < images.size()-1; i++){
         cv::Mat img1 = cv::imread(images[i], cv::IMREAD_GRAYSCALE);
         for(int j = i+1; j < images.size(); j++){
