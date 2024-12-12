@@ -14,9 +14,9 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     cv::Mat baseImage;
     baseImage = createBaseImage(imgpath);
     cout << "ORB running..." << endl;
-    cv::imshow("Base Image", baseImage);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
+    // cv::imshow("Base Image", baseImage);
+    // cv::waitKey(1);
+    // cv::destroyAllWindows();
     // calling FAST9 
     cout << "running" << endl;
     vector<cv::Point> initialKeypoints = FAST9(baseImage, 20);
@@ -77,18 +77,18 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
     // Show the image with keypoints
     cv::imshow("Keypoints", imgWithKeypoints);
-    cv::waitKey(0);
+    cv::waitKey(1);
     cout << "done" << endl;
     // Print the descriptors
-    cout << "Descriptors (first 5 descriptors):" << endl;
-    for (size_t i = 0; i < std::min(descriptors.rows, 5); ++i) {
-        cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
-    }
+    // cout << "Descriptors (first 5 descriptors):" << endl;
+    // for (size_t i = 0; i < min(descriptors.rows, 5); ++i) {
+    //     cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
+    // }
     cout << descriptors.size() << endl;
     cout << "done" << endl;
-    cv::imshow("Filtered Keypoints with Orientations", displayImage);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
+    // cv::imshow("Filtered Keypoints with Orientations", displayImage);
+    // cv::waitKey(1);
+    // cv::destroyAllWindows();
     cout << "ORB pipeline completed successfully." << endl;
 
     return {filteredKeypoints,descriptors};
@@ -160,22 +160,19 @@ pair<string,string> initial_image_pair(vector<string> images){
             cout << images[j] << endl;
             // orb(->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
             // orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);)
-            pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors = runORB("dataset/water_canon/1.jpg");
-            vector<cv::KeyPoint> keypoints = keypoints_descriptors.first;
-            cv::Mat descriptors = keypoints_descriptors.second;
+            vector<cv::KeyPoint> keypoints1, keypoints2;
+            cv::Mat descriptors1, descriptors2;
+            cout << "CALL 1" << endl;
+            pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors1 = runORB(images[i]);
+            keypoints1 = keypoints_descriptors1.first;
+            descriptors1 = keypoints_descriptors1.second;
+            cout << "CALL 2" << endl;
+            pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors2 = runORB(images[j]);
+            keypoints2 = keypoints_descriptors2.first;
+            descriptors2 = keypoints_descriptors2.second;
+
             vector<cv::Point2f> points_1, points_2;
-
-            for(auto match : keypoints){
-                points_1.push_back(cv::Point2f(match.pt.x, match.pt.y));
-                points_2.push_back(cv::Point2f(match.pt.x, match.pt.y));
-            }
-
-            vector<cv::KeyPoint> matches1, matches2;
-            for(auto match : keypoints){
-                matches1.push_back(cv::KeyPoint(match.pt.x, match.pt.y, 1));
-                matches2.push_back(cv::KeyPoint(match.pt.x, match.pt.y, 1));
-            }
-
+            cout << "Called ORB" << endl;
             vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
             cout << "number of matches: " << matches.size() << endl;
             // plotMatches(img1, img2, keypoints1, keypoints2, matches);
@@ -186,7 +183,8 @@ pair<string,string> initial_image_pair(vector<string> images){
                 points1.push_back(match.first.pt);
                 points2.push_back(match.second.pt);
             }
-
+            cout << "number of points: " << points1.size() << endl;
+            cout << "number of points: " << points2.size() << endl;
             // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
                 cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);

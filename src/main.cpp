@@ -97,11 +97,11 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
 }
 
 int main(){
-    cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    // cv::Ptr<cv::ORB> orb = cv::ORB::create();
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
     pair<string,string> initial_image_pair_paths;
-    bool FLAG_initial_image_pair = true; // set to true if the initial image pair is provided
+    bool FLAG_initial_image_pair = false; // set to true if the initial image pair is provided
 
     // get the camera intrinsics from calibration file
     // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)
@@ -158,8 +158,17 @@ int main(){
     // img1_undistorted = img1;
     // img2_undistorted = img2;
     // detect and compute the keypoints and descriptors
-    orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
-    orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
+    // orb->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
+    // orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);
+
+    pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors1 = runORB(initial_image_pair_paths.first);
+    keypoints1 = keypoints_descriptors1.first;
+    descriptors1 = keypoints_descriptors1.second;
+
+    pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors2 = runORB(initial_image_pair_paths.second);
+    keypoints2 = keypoints_descriptors2.first;
+    descriptors2 = keypoints_descriptors2.second;
+
     // use our BFMatcher to return the matched keypoints
     vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
     vector<cv::Point2f> points1, points2;
