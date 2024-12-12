@@ -10,7 +10,7 @@
 
 using namespace std;
 
-pair<vector<cv::KeyPoint>,vector<cv::Mat>> runORB(const string& imgpath){
+pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     cv::Mat baseImage;
     baseImage = createBaseImage(imgpath);
     cout << "ORB running..." << endl;
@@ -58,7 +58,7 @@ pair<vector<cv::KeyPoint>,vector<cv::Mat>> runORB(const string& imgpath){
     for (const auto& kp : filteredKeypoints) {
         keypointPoints.push_back(kp.pt);
     }
-    vector<cv::Mat> descriptors = rBRIEF(baseImage, keypointPoints, 31);
+    cv::Mat descriptors = rBRIEF(baseImage, keypointPoints, 31);
 
     // vector<cv::Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
     cout << "Descriptors computed using rBRIEF." << endl;
@@ -69,9 +69,9 @@ pair<vector<cv::KeyPoint>,vector<cv::Mat>> runORB(const string& imgpath){
     cv::Mat imgWithKeypoints;
         // Print the descriptors
     cout << "Descriptors (first 5 descriptors):" << endl;
-    for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
-        cout << "Descriptor " << i << ": " << descriptors[i] << endl;
-    }
+    // for (size_t i = 0; i < std::min(descriptors.size(), (size_t)5); ++i) {
+    //     cout << "Descriptor " << i << ": " << descriptors[i] << endl;
+    // }
     cout << descriptors.size() << endl;
     cout << "done" << endl;
     drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
@@ -81,8 +81,8 @@ pair<vector<cv::KeyPoint>,vector<cv::Mat>> runORB(const string& imgpath){
     cout << "done" << endl;
     // Print the descriptors
     cout << "Descriptors (first 5 descriptors):" << endl;
-    for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
-        cout << "Descriptor " << i << ": " << descriptors[i] << endl;
+    for (size_t i = 0; i < std::min(descriptors.rows, 5); ++i) {
+        cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
     }
     cout << descriptors.size() << endl;
     cout << "done" << endl;
@@ -160,9 +160,9 @@ pair<string,string> initial_image_pair(vector<string> images){
             cout << images[j] << endl;
             // orb(->detectAndCompute(img1, cv::noArray(), keypoints1, descriptors1);
             // orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);)
-            pair<vector<cv::KeyPoint>,vector<cv::Mat>> keypoints_descriptors = runORB("dataset/water_canon/1.jpg");
+            pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors = runORB("dataset/water_canon/1.jpg");
             vector<cv::KeyPoint> keypoints = keypoints_descriptors.first;
-            vector<cv::Mat> descriptors = keypoints_descriptors.second;
+            cv::Mat descriptors = keypoints_descriptors.second;
             vector<cv::Point2f> points_1, points_2;
 
             for(auto match : keypoints){

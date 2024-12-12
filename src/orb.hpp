@@ -18,7 +18,7 @@ double orientationAssignment(const cv::Mat& image, const cv::Point& keypoint, in
 
 double harrisResponse(const cv::Mat& image, const cv::Point& keypoint, int blockSize = 3, double k = 0.04);
 
-std::vector<cv::Mat> rBRIEF(const cv::Mat& image, const std::vector<cv::Point>& keypoints, int patchSize = 31);
+cv::Mat rBRIEF(const cv::Mat& image, const std::vector<cv::Point>& keypoints, int patchSize = 31);
 
 struct KeypointWithResponse {
     cv::Point point;

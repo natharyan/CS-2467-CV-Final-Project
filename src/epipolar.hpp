@@ -10,7 +10,7 @@
 using namespace std;
 
 // run orb 
-pair<vector<cv::KeyPoint>,vector<cv::Mat>> runORB(const string& imgpath);
+pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath);
 
 // get the epipolar lines using the fundamental matrix and the matched keypoints from the first image in the pair selected
 cv::Mat epipolar_line(cv::Mat fundamental_matrix, cv::Point2d keypoint1);
