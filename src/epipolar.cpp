@@ -163,11 +163,11 @@ pair<string,string> initial_image_pair(vector<string> images){
             pair<vector<cv::KeyPoint>,vector<cv::Mat>> keypoints_descriptors = runORB("dataset/water_canon/1.jpg");
             vector<cv::KeyPoint> keypoints = keypoints_descriptors.first;
             vector<cv::Mat> descriptors = keypoints_descriptors.second;
-            vector<cv::Point2f> points1, points2;
+            vector<cv::Point2f> points_1, points_2;
 
             for(auto match : keypoints){
-                points1.push_back(cv::Point2f(match.pt.x, match.pt.y));
-                points2.push_back(cv::Point2f(match.pt.x, match.pt.y));
+                points_1.push_back(cv::Point2f(match.pt.x, match.pt.y));
+                points_2.push_back(cv::Point2f(match.pt.x, match.pt.y));
             }
 
             vector<cv::KeyPoint> matches1, matches2;
