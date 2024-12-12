@@ -7,6 +7,7 @@
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
 #include "orb.hpp"
+#include "ransac.hpp"
 
 using namespace std;
 
@@ -19,12 +20,13 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     // cv::destroyAllWindows();
     // calling FAST9 
     cout << "running" << endl;
-    vector<cv::Point> initialKeypoints = FAST9(baseImage, 20);
+    vector<cv::Point> initialKeypoints = FAST9(baseImage, 40);
     cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
     // harris corner response 
     vector<KeypointWithResponse> keypointsWithResponses;
     for (const cv::Point& kp : initialKeypoints) {
         double response = harrisResponse(baseImage, kp);
+        // cout << "response: " << response << endl;
         // Retain only the keypoints with a Harris response greater than 0.01
         if (response > 0.01) { 
             keypointsWithResponses.push_back({kp, response});
@@ -61,31 +63,32 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     cv::Mat descriptors = rBRIEF(baseImage, keypointPoints, 31);
 
     // vector<cv::Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
-    cout << "Descriptors computed using rBRIEF." << endl;
+    // cout << "Descriptors computed using rBRIEF." << endl;
     // Visualize the keypoints
     cv::Mat displayImage;
     cvtColor(baseImage, displayImage, cv::COLOR_GRAY2BGR);  
     // Display keypoints on the image
     cv::Mat imgWithKeypoints;
         // Print the descriptors
-    cout << "Descriptors (first 5 descriptors):" << endl;
+    // cout << "Descriptors (first 5 descriptors):" << endl;
     // for (size_t i = 0; i < std::min(descriptors.size(), (size_t)5); ++i) {
     //     cout << "Descriptor " << i << ": " << descriptors[i] << endl;
     // }
-    cout << descriptors.size() << endl;
+    // cout << descriptors.size() << endl;
     // cout << "done" << endl;
-    // drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
+    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
     // // Show the image with keypoints
-    // cv::imshow("Keypoints", imgWithKeypoints);
-    // cv::waitKey(1);
+    cout << "img with keypoints size: " << imgWithKeypoints.size() << endl;
+    cv::imshow("Keypoints", imgWithKeypoints);
+    cv::waitKey(1);
     cout << "done" << endl;
     // Print the descriptors
     // cout << "Descriptors (first 5 descriptors):" << endl;
     // for (size_t i = 0; i < min(descriptors.rows, 5); ++i) {
     //     cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
     // }
-    cout << descriptors.size() << endl;
-    cout << "done" << endl;
+    // cout << descriptors.size() << endl;
+    // cout << "done" << endl;
     // cv::imshow("Filtered Keypoints with Orientations", displayImage);
     // cv::waitKey(1);
     // cv::destroyAllWindows();
@@ -162,11 +165,11 @@ pair<string,string> initial_image_pair(vector<string> images){
             // orb->detectAndCompute(img2, cv::noArray(), keypoints2, descriptors2);)
             vector<cv::KeyPoint> keypoints1, keypoints2;
             cv::Mat descriptors1, descriptors2;
-            cout << "CALL 1" << endl;
+            // cout << "CALL 1" << endl;
             pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors1 = runORB(images[i]);
             keypoints1 = keypoints_descriptors1.first;
             descriptors1 = keypoints_descriptors1.second;
-            cout << "CALL 2" << endl;
+            // cout << "CALL 2" << endl;
             pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors2 = runORB(images[j]);
             keypoints2 = keypoints_descriptors2.first;
             descriptors2 = keypoints_descriptors2.second;
@@ -183,15 +186,41 @@ pair<string,string> initial_image_pair(vector<string> images){
                 points1.push_back(match.first.pt);
                 points2.push_back(match.second.pt);
             }
-            cout << "number of points: " << points1.size() << endl;
-            cout << "number of points: " << points2.size() << endl;
             // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
                 // TODO: add fundamental matrix estimation using our ransac
                 cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+                int maxIterations = 1000;
+                double threshold = 0.01;
+
+                vector<pair<Eigen::Vector2d, Eigen::Vector2d>> eigen_matches;
+                for (const auto& match : matches) {
+                    Eigen::Vector2d pt1(match.first.pt.x, match.first.pt.y);
+                    Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
+                    eigen_matches.emplace_back(pt1, pt2);
+                }
+                MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
+
+                cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
+                cout << "fundamental Matrix: " << endl << F << endl;
                 // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
                 // check if fundamental matrix is empty
-                cout << "fundamental matrix: " << fundamental_matrix << endl;
+                // cout << "fundamental matrix: " << fundamental_matrix << endl;
+                // convert F (MatrixXd) to cv::Mat
+                cv::Mat F_cv;
+                cv::Mat F_cv(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
+
+                // Copy data from Eigen matrix to cv::Mat
+                for (int i = 0; i < F.rows(); ++i) {
+                    for (int j = 0; j < F.cols(); ++j) {
+                        F_cv.at<double>(i, j) = F(i, j);
+                    }
+                }
+
+                
+                if(fundamental_matrix.empty()){
+                    continue;
+                }
                 for(int k = 0; k < points1.size(); k++){
                     bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
                     if(epipolar_constraint_satisfied){
