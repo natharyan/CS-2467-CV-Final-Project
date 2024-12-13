@@ -83,12 +83,12 @@ pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     // }
     // cout << descriptors.size() << endl;
     // cout << "done" << endl;
-    drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
     // // Show the image with keypoints
-    cout << "img with keypoints size: " << imgWithKeypoints.size() << endl;
-    cv::imshow("Keypoints", imgWithKeypoints);
-    cv::waitKey(1);
-    cout << "done" << endl;
+    // drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
+    // cout << "img keypoints size: " << imgWithKeypoints.size() << endl;
+    // cv::imshow("Keypoints", imgWithKeypoints);
+    // cv::waitKey(1);
+    // cout << "done" << endl;
     // Print the descriptors
     // cout << "Descriptors (first 5 descriptors):" << endl;
     // for (size_t i = 0; i < min(descriptors.rows, 5); ++i) {

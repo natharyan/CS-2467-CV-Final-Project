@@ -37,10 +37,10 @@ Triangulation: *(done) (Manya) and (Aryan)*
 
 Week 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
 
-Incremental Image Addition: *(Manya)*
-Implement an image addition loop where new images are added based on overlapping 2D-3D correspondences.
-Estimate the new camera pose using PnP (Perspective-n-Point) with RANSAC. Triangulate new points and integrate them into the existing 3D model.
-Output: Incremental 3D point cloud with more views added.
+Incremental Image Addition: *(Manya) and (Aryan)*
+Implement an image addition loop where new images are added based on overlapping 2D-3D correspondences. *(done)*
+Estimate the new camera pose using PnP (Perspective-n-Point) with RANSAC. Triangulate new points and integrate them into the existing 3D model. *(done)*
+Output: Incremental 3D point cloud with more views added. *(done)*
 Deliverables: Visualize step-by-step growth of the 3D model.
 
 Bundle Adjustment(on each incremwent perform bundle adjustment to refine the camera parameters and 3D points):

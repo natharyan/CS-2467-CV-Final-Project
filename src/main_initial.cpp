@@ -1,10 +1,10 @@
 #include <iostream>
-#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <opencv2/viz.hpp>
 #include <filesystem>
 #include <vector>
 #include <fstream>
+#include <algorithm>
 #include "bfmatcher.hpp"
 #include "epipolar.hpp"
 #include "ransac.hpp"
@@ -184,41 +184,20 @@ tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(co
 
     // Plot the matches
     cout << "Plotting matches..." << endl;
-    cout << "Number of points_prev: " << points_prev.size() << endl;
-    cout << "Number of points_curr: " << points_curr.size() << endl;
-    cout << "Image 1 size: " << prev_img.size() << endl;
-    cout << "Image 2 size: " << cur_img.size() << endl;
     plotMatches(prev_img, cur_img, matches);
     cout << "Matches plotted." << endl;
     // Estimate the fundamental matrix using RANSAC
+    cout << "Number of points_prev: " << points_prev.size() << endl;
+    cout << "Number of points_curr: " << points_curr.size() << endl;
     cv::Mat fundamental_matrix = cv::findFundamentalMat(points_prev, points_curr, cv::FM_RANSAC);
     // fundamental_matrix.convertTo(fundamental_matrix, CV_64F);
-    // int num_inliers = 0;
-    // int maxIterations = 1000;
-    // double threshold = 0.01;
-
-    // vector<pair<Eigen::Vector2d, Eigen::Vector2d>> eigen_matches;
-    // for (const auto& match : matches) {
-    //     Eigen::Vector2d pt1(match.first.pt.x, match.first.pt.y);
-    //     Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
-    //     eigen_matches.emplace_back(pt1, pt2);
-    // }
-    // pair<MatrixXd, vector<bool>> F_and_inliers = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
-    // MatrixXd F = F_and_inliers.first;
-    // vector<bool> inliers = F_and_inliers.second;
-    // cv::Mat fundamental_matrix(F.rows(), F.cols(), CV_64F);
     cout << "Fundamental matrix: " << fundamental_matrix << endl;
-    cout << "Size: " << fundamental_matrix.size() << endl;
-    // all elements are zero in the fundamental matrix
-    if (!fundamental_matrix.empty() && fundamental_matrix.rows >= 3 && fundamental_matrix.cols >= 3) {
-        fundamental_matrix = fundamental_matrix(cv::Range(0, 3), cv::Range(0, 3));
-    } else {
-        cout << "Error: Fundamental matrix has invalid dimensions or is empty." << endl;
-        return make_tuple(points3d_prev, keypoints_prev, descriptors_prev);
+    if(fundamental_matrix.empty()){
+        return make_tuple(points3d_prev, keypoints_curr, descriptors_curr);
     }
     // Compute the essential matrix
     cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
-    cout << "Essential matrix: " << endl << E << endl;
+
     // Decompose the essential matrix to get rotation and translation candidates
     vector<pair<cv::Mat, cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
 
@@ -391,8 +370,8 @@ int main(){
         }
     }
     
-    // cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
-    // cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
+    cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
+    cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
     for(int k = 0; k < points1.size(); k++){
         bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix_opencv, points1[k], points2[k]);
         if(epipolar_constraint_satisfied){
@@ -510,32 +489,6 @@ int main(){
             cout << "3D point: " << points3d[i] << endl;
     }
 
-    // Iterate through remaining images and add them incrementally
-    cout << "reached here" << endl; 
-    string img_path = "dataset/Book Statue";
-    vector<string> images;
-    for (const auto & entry : fs::directory_iterator(img_path))
-        images.push_back(entry.path());
-
-    // Remove initial image pair from the list
-    images.erase(remove(images.begin(), images.end(), initial_image_pair_paths.first), images.end());
-    images.erase(remove(images.begin(), images.end(), initial_image_pair_paths.second), images.end());
-
-    cout << "almost there" << endl; 
-    cout << "Number of 3D points: " << points3d.size() << endl;
-    string prev_path = initial_image_pair_paths.second;
-    string cur_path;
-    while(images.size() > 0){
-        cur_path = images.back();
-        cout << "Processing image: " << cur_path << endl;
-        tie(points3d, keypoints1, descriptors1) = incrementalAddition(cur_path, prev_path, K, distortion_coefficients, keypoints1, descriptors1, points3d);
-        prev_path = cur_path;
-        images.pop_back();
-        cout << "Number of 3D points: " << points3d.size() << endl;
-    }
-
-    cout << "really there?" << endl; 
-
     for (int i = 0; i < points3d.size(); i++) {
         cout << "3D point: " << points3d[i] << endl;
     }
@@ -545,55 +498,44 @@ int main(){
     window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
-    // Find the global bounding box of the point cloud
-    cv::Point3d min_point(std::numeric_limits<double>::max(), 
-                          std::numeric_limits<double>::max(), 
-                          std::numeric_limits<double>::max());
-    cv::Point3d max_point(std::numeric_limits<double>::lowest(), 
-                          std::numeric_limits<double>::lowest(), 
-                          std::numeric_limits<double>::lowest());
-
-    for (const auto& pt : points3d) {
-        min_point.x = min(min_point.x, static_cast<double>(pt.x));
-        min_point.y = min(min_point.y, static_cast<double>(pt.y));
-        min_point.z = min(min_point.z, static_cast<double>(pt.z));
-        max_point.x = max(max_point.x, static_cast<double>(pt.x));
-        max_point.y = max(max_point.y, static_cast<double>(pt.y));
-        max_point.z = max(max_point.z, static_cast<double>(pt.z));
-    }
-
-    // Calculate the diagonal length of the bounding box
-    double diagonal_length = std::sqrt(
-        std::pow(max_point.x - min_point.x, 2) +
-        std::pow(max_point.y - min_point.y, 2) +
-        std::pow(max_point.z - min_point.z, 2)
-    );
-
-    // Calculate center of the bounding box
-    cv::Point3d center(
-        (min_point.x + max_point.x) / 2.0,
-        (min_point.y + max_point.y) / 2.0,
-        (min_point.z + max_point.z) / 2.0
-    );
-
-    // Create point cloud widget with single color
+    // Create point cloud widget
     cv::viz::WCloud cloud_widget(points3d, cv::viz::Color::white());
     cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 5.0);
 
     // Show the point cloud widget
     window.showWidget("point_cloud", cloud_widget);
 
-    // Compute camera distance with a multiplier to ensure all points are visible
-    double camera_distance = diagonal_length * 2.0;
+    // Set camera pose to view the point cloud
+    // Find the center of the point cloud
+    cv::Point3d center(0, 0, 0);
+    for (const auto& pt : points3d) {
+        center.x += pt.x;
+        center.y += pt.y;
+        center.z += pt.z;
+    }
+    center.x /= points3d.size();
+    center.y /= points3d.size();
+    center.z /= points3d.size();
 
-    // Set camera pose to encompass all points
+    // Compute max distance from center to determine camera distance
+    double max_dist = 0;
+    for (const auto& pt : points3d) {
+        double dist = sqrt(
+            pow(pt.x - center.x, 2) +
+            pow(pt.y - center.y, 2) +
+            pow(pt.z - center.z, 2)
+        );
+        max_dist = max(max_dist, dist);
+    }
+
+    // Set camera pose to look at the center of the point cloud
     cv::Affine3d camera_pose = cv::viz::makeCameraPose(
-        cv::Vec3d(center.x, center.y, center.z + camera_distance),  // Camera position
+        cv::Vec3d(center.x, center.y, center.z + max_dist * 2),  // Camera position
         cv::Vec3d(center.x, center.y, center.z),  // Look at center
         cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
-    cv::viz::writeCloud("point_cloud.ply", points3d);
+    cv::viz::writeCloud("initial_image_pair1.ply", points3d);
     // Start visualization
     window.spin();
 

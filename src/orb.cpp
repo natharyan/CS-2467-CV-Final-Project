@@ -13,7 +13,6 @@ using namespace std;
 
 // Bit patterns from opencv/modules/features2d/src/orb.cpp for faster computation
 
-
 // create base image 
 cv::Mat createBaseImage(const string& imagePath)
 {
@@ -117,32 +116,47 @@ double orientationAssignment(const Mat& image, const Point& keypoint, int patchS
     return 0.0;  
 }
 
-// Harris Corner Response 
+// Harris 
 double harrisResponse(const Mat& gray, const Point& keypoint, int blockSize = 3, double k = 0.04) {
     int radius = blockSize / 2;
-    
     double sumIx2 = 0.0, sumIy2 = 0.0, sumIxy = 0.0;
 
-    // Iterate over a block around the keypoint
+    // Optional: Gaussian weighting
+    double sigma = blockSize / 6.0;
+    double gaussianNorm = 0.0;
+
     for (int dx = -radius; dx <= radius; ++dx) {
         for (int dy = -radius; dy <= radius; ++dy) {
             int x = keypoint.x + dx;
             int y = keypoint.y + dy;
 
-            if (x >= 0 && x < gray.cols && y >= 0 && y < gray.rows) {
-                // Gradient calculation 
-                int Ix = gray.at<uchar>(y, x + 1) - gray.at<uchar>(y, x - 1);  
-                int Iy = gray.at<uchar>(y + 1, x) - gray.at<uchar>(y - 1, x);  
-                sumIx2 += Ix * Ix;
-                sumIy2 += Iy * Iy;
-                sumIxy += Ix * Iy;
+            if (x >= 1 && x < gray.cols - 1 && y >= 1 && y < gray.rows - 1) {
+                // Floating-point gradients for more precision
+                double Ix = static_cast<double>(gray.at<uchar>(y, x + 1) - gray.at<uchar>(y, x - 1));
+                double Iy = static_cast<double>(gray.at<uchar>(y + 1, x) - gray.at<uchar>(y - 1, x));
+
+                // Optional Gaussian weighting
+                double gaussian = exp(-(dx*dx + dy*dy) / (2 * sigma * sigma));
+                gaussianNorm += gaussian;
+
+                sumIx2 += gaussian * Ix * Ix;
+                sumIy2 += gaussian * Iy * Iy;
+                sumIxy += gaussian * Ix * Iy;
             }
         }
     }
 
-    // Compute determinant and trace of M
+    // Normalize by Gaussian weights if used
+    if (gaussianNorm > 0) {
+        sumIx2 /= gaussianNorm;
+        sumIy2 /= gaussianNorm;
+        sumIxy /= gaussianNorm;
+    }
+
+    // Compute determinant and trace of the covariance matrix M
     double detM = (sumIx2 * sumIy2) - (sumIxy * sumIxy);
     double traceM = sumIx2 + sumIy2;
+    
     return detM - k * (traceM * traceM);
 }
 
@@ -192,9 +206,9 @@ struct KeypointWithResponse {
 //     cv::Mat baseImage;
 //     baseImage = createBaseImage(imgpath);
 //     cout << "SIFT running..." << endl;
-//     cv::imshow("Base Image", baseImage);
-//     cv::waitKey(0);
-//     cv::destroyAllWindows();
+//     // cv::imshow("Base Image", baseImage);
+//     // cv::waitKey(0);
+//     // cv::destroyAllWindows();
 //     // calling FAST9 
 //     cout << "running" << endl;
 //     vector<Point> initialKeypoints = FAST9(baseImage, 20);
@@ -210,13 +224,15 @@ struct KeypointWithResponse {
 //         }
 //     }
 
+//     cout << keypointsWithResponses.size() << endl; 
+
 //     // Sort the keypoints based on Harris response
 //     sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
-//         return a.harrisResponse > b.harrisResponse;
+//         return a.harrisResponse < b.harrisResponse;
 //     });
 
 //     // Retain only the top N keypoints
-//     const int maxKeypoints = 500;
+//     const int maxKeypoints =1000;
 //     if (keypointsWithResponses.size() > maxKeypoints) {
 //         keypointsWithResponses.resize(maxKeypoints);
 //     }
@@ -239,7 +255,7 @@ struct KeypointWithResponse {
 //     }
 
 //     // Compute rBRIEF descriptors
-//     vector<Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
+//     cv::Mat descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
 //     cout << "Descriptors computed using rBRIEF." << endl;
 
 //     // Visualize the keypoints
@@ -256,11 +272,9 @@ struct KeypointWithResponse {
 
 //     // Print the descriptors
 //     cout << "Descriptors (first 5 descriptors):" << endl;
-//     for (size_t i = 0; i < min(descriptors.size(), (size_t)5); ++i) {
-//         cout << "Descriptor " << i << ": " << descriptors[i] << endl;
+//     for (int i = 0; i < min(descriptors.rows, 5); ++i) {
+//         cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
 //     }
-//     // cout << descriptors.size() << endl;
-//     // cout << "done" << endl;
 
 //     imshow("Filtered Keypoints with Orientations", displayImage);
 //     waitKey(0);

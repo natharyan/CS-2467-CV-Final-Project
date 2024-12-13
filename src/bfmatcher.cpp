@@ -45,7 +45,7 @@ vector<pair<cv::KeyPoint, cv::KeyPoint>> getMatches_Keypoints(const cv::Mat& des
         }
 
         // Apply Lowe's ratio test
-        if (best_idx != -1 && best_dist < ratio * second_best_dist) {
+        if (best_idx != -1 && best_dist < ratio * second_best_dist && !matched_descriptors2[best_idx]) {
             matches.push_back({keypoints1[i], keypoints2[best_idx]});
             matched_descriptors2[best_idx] = true;
         }
