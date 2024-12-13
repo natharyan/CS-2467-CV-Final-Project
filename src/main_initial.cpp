@@ -120,44 +120,116 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
 }
 
 // normalize the points
-tuple<cv::Point2f, double, vector<cv::Point2f>> normalizePoints(const vector<cv::Point2f>& points) {
-    cv::Point2f centroid(0, 0);
-    for (const auto& point : points) {
-        centroid.x += point.x;
-        centroid.y += point.y;
+// normalize the points with centroid and scale
+// std::tuple<cv::Point2f, double, std::vector<cv::Point2f>> normalizePoints(const std::vector<cv::Point2f>& points) {
+//     cv::Point2f centroid(0, 0);
+//     for (const auto& point : points) {
+//         centroid.x += point.x;
+//         centroid.y += point.y;
+//     }
+//     centroid.x /= points.size();
+//     centroid.y /= points.size();
+
+//     double rms_dist = 0;
+//     for (const auto& point : points) {
+//         rms_dist += cv::norm(point - centroid);
+//     }
+//     rms_dist = sqrt(rms_dist / points.size());
+
+//     double scale = sqrt(2.0) / rms_dist;
+
+//     std::vector<cv::Point2f> normalized_points;
+//     for (const auto& point : points) {
+//         normalized_points.emplace_back((point - centroid) * scale);
+//     }
+
+//     return {centroid, scale, normalized_points};
+// }
+
+// normalization with intrinsice matrix
+tuple<cv::Point2f, double, std::vector<cv::Point2f>> normalizePoints(const vector<cv::Point2f>& points, const cv::Mat& K) {
+    // Ensure K is a 3x3 matrix
+    if (K.rows != 3 || K.cols != 3) {
+        throw std::invalid_argument("Intrinsic matrix K must be 3x3");
     }
+
+    // Extract intrinsic parameters
+    double fx = K.at<double>(0, 0); // Focal length in x
+    double fy = K.at<double>(1, 1); // Focal length in y
+    double u0 = K.at<double>(0, 2); // Principal point x
+    double v0 = K.at<double>(1, 2); // Principal point y
+
+    vector<cv::Point2f> normalizedPoints;
+    cv::Point2f centroid(0, 0);
+    double scaleFactor = 0;
+
+    // Normalize each point
+    for (const auto& pt : points) {
+        double x_norm = (pt.x - u0) / fx;
+        double y_norm = (pt.y - v0) / fy;
+
+        cv::Point2f norm_pt(x_norm, y_norm);
+        normalizedPoints.push_back(norm_pt);
+
+        // Accumulate centroid
+        centroid.x += norm_pt.x;
+        centroid.y += norm_pt.y;
+    }
+
+    // Compute centroid
     centroid.x /= points.size();
     centroid.y /= points.size();
 
-    double rms_dist = 0;
-    for (const auto& point : points) {
-        rms_dist += cv::norm(point - centroid);
-    }
-    rms_dist = sqrt(rms_dist / points.size());
-
-    double scale = sqrt(2.0) / rms_dist;
-
-    vector<cv::Point2f> normalized_points;
-    for (const auto& point : points) {
-        normalized_points.emplace_back((point - centroid) * scale);
+    // Compute average scale (distance from centroid to points)
+    double totalScale = 0.0;
+    for (const auto& norm_pt : normalizedPoints) {
+        totalScale += std::sqrt(std::pow(norm_pt.x - centroid.x, 2) + std::pow(norm_pt.y - centroid.y, 2));
     }
 
-    return {centroid, scale, normalized_points};
+    scaleFactor = totalScale / points.size();
+
+    return {centroid, scaleFactor, normalizedPoints};
 }
 
-// denormalize the points
-vector<cv::Point3f> denormalize3DPoints(
-    const vector<cv::Point3f>& points,
-    const cv::Point2f& centroid, double scale) {
+// denormalize the points with the centroid and scale
+// std::vector<cv::Point3f> denormalize3DPoints(
+//     const std::vector<cv::Point3f>& points,
+//     const cv::Point2f& centroid, double scale) {
 
-    vector<cv::Point3f> denormalized_points;
-    for (const auto& point : points) {
-        denormalized_points.emplace_back(
-            point.x / scale + centroid.x,
-            point.y / scale + centroid.y,
-            point.z * scale); // Scale depth appropriately
+//     std::vector<cv::Point3f> denormalized_points;
+//     for (const auto& point : points) {
+//         denormalized_points.emplace_back(
+//             point.x / scale + centroid.x,
+//             point.y / scale + centroid.y,
+//             point.z * scale); // Scale depth appropriately
+//     }
+//     return denormalized_points;
+// }
+
+// denormalization with intrinsic matrix
+vector<cv::Point3f> denormalize3DPoints(const vector<cv::Point3f>& normalizedPoints, const cv::Mat& K) {
+    // Ensure K is a 3x3 matrix
+    if (K.rows != 3 || K.cols != 3) {
+        throw std::invalid_argument("Intrinsic matrix K must be 3x3");
     }
-    return denormalized_points;
+
+    // Extract intrinsic parameters
+    double fx = K.at<double>(0, 0); // Focal length in x
+    double fy = K.at<double>(1, 1); // Focal length in y
+    double u0 = K.at<double>(0, 2); // Principal point x
+    double v0 = K.at<double>(1, 2); // Principal point y
+
+    std::vector<cv::Point3f> denormalizedPoints;
+
+    for (const auto& pt : normalizedPoints) {
+        double x_denorm = fx * pt.x + u0;
+        double y_denorm = fy * pt.y + v0;
+        double z_denorm = pt.z; // z-coordinate remains unchanged
+
+        denormalizedPoints.emplace_back(x_denorm, y_denorm, z_denorm);
+    }
+
+    return denormalizedPoints;
 }
 
 tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(const string& cur_imgpath, const string& prev_imgpath, const cv::Mat& K, const cv::Mat& distortion_coefficients, vector<cv::KeyPoint>& keypoints_prev, cv::Mat& descriptors_prev, vector<cv::Point3f>& points3d_prev) {
@@ -205,8 +277,8 @@ tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(co
     vector<cv::Point2f> norm_points_prev, norm_points_curr;
     cv::Point2f centroid_prev, centroid_curr;
     double scale_prev, scale_curr;
-    tie(centroid_prev, scale_prev, norm_points_prev) = normalizePoints(points_prev);
-    tie(centroid_curr, scale_curr, norm_points_curr) = normalizePoints(points_curr);
+    tie(centroid_prev, scale_prev, norm_points_prev) = normalizePoints(points_prev, K);
+    tie(centroid_curr, scale_curr, norm_points_curr) = normalizePoints(points_curr, K);
 
     // Use cheirality check to get the correct rotation and translation
     cv::Mat R, t;
@@ -236,7 +308,7 @@ tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(co
     }
 
     // Denormalize the 3D points
-    points3d_curr = denormalize3DPoints(points3d_curr, centroid_prev, scale_prev);
+    points3d_curr = denormalize3DPoints(points3d_curr, K);
     // Append the new 3D points to the previous 3D points
     points3d_prev.insert(points3d_prev.end(), points3d_curr.begin(), points3d_curr.end());
 
@@ -396,8 +468,8 @@ int main(){
     vector<cv::Point2f> norm_points1, norm_points2;
     cv::Point2f centroid1, centroid2;
     double scale1, scale2;
-    tie(centroid1, scale1, norm_points1) = normalizePoints(points1);
-    tie(centroid2, scale2, norm_points2) = normalizePoints(points2);
+    tie(centroid1, scale1, norm_points1) = normalizePoints(points1, K);
+    tie(centroid2, scale2, norm_points2) = normalizePoints(points2, K);
     
     // norm_points1 = normalizePoints(points1, K);
     // norm_points2 = normalizePoints(points2, K);
@@ -483,7 +555,7 @@ int main(){
     }
 
     // denormalize the 3d points
-    points3d = denormalize3DPoints(points3d, centroid1, scale1);
+    points3d = denormalize3DPoints(points3d, K);
     cout << "Denormalized 3D points: " << endl;
     for (int i = 0; i < points3d.size(); i++) {
             cout << "3D point: " << points3d[i] << endl;
