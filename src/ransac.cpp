@@ -1,85 +1,82 @@
-#include <iostream>
-#include <vector>
-#include <random>
-#include <Eigen/Dense>
+#include "ransac.hpp"
+#include <cmath>
+#include <ctime>
+#include <unordered_set>
 
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
-using Eigen::JacobiSVD;
-using Eigen::ComputeFullU;
-using Eigen::ComputeFullV;
+using namespace Eigen;
+using namespace std;
 
-// Helper function: Compute the fundamental matrix using the 8-point algorithm
-MatrixXd computeFundamentalMatrix(const std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>>& matches) {
-    MatrixXd A(matches.size(), 9);
-    for (size_t i = 0; i < matches.size(); ++i) {
-        double x1 = matches[i].first(0);
-        double y1 = matches[i].first(1);
-        double x2 = matches[i].second(0);
-        double y2 = matches[i].second(1);
+struct Match {
+    double x1, y1, x2, y2;
+};
 
-        A(i, 0) = x1 * x2;
-        A(i, 1) = x1 * y2;
-        A(i, 2) = x1;
-        A(i, 3) = y1 * x2;
-        A(i, 4) = y1 * y2;
-        A(i, 5) = y1;
-        A(i, 6) = x2;
-        A(i, 7) = y2;
-        A(i, 8) = 1.0;
-    }
-
-    JacobiSVD<MatrixXd> svd(A, ComputeFullU | ComputeFullV);
-    VectorXd f = svd.matrixV().col(8);
-
-    MatrixXd F(3, 3);
-    F << f(0), f(1), f(2),
-         f(3), f(4), f(5),
-         f(6), f(7), f(8);
-
-    JacobiSVD<MatrixXd> svdF(F, ComputeFullU | ComputeFullV);
-    VectorXd singularValues = svdF.singularValues();
-    singularValues(2) = 0; // Enforce rank 2
-    F = svdF.matrixU() * singularValues.asDiagonal() * svdF.matrixV().transpose();
-
-    return F;
-}
-
-// RANSAC to estimate the fundamental matrix
-MatrixXd ransacFundamentalMatrix(const std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>>& matches, int maxIterations, double threshold) {
-    int bestInlierCount = 0;
-    MatrixXd bestF;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
+pair<MatrixXd, vector<bool>> ransacFundamentalMatrix( const vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>>& matches, int maxIterations, double threshold) {
+    const int sampleSize = 8;
+    const int numMatches = matches.size();
+    MatrixXd bestF(3, 3);
+    vector<bool> bestInliers(numMatches, false);
+    int maxInliers = 0;
+    // unsigned int seed = static_cast<unsigned int>(time(nullptr));
+    unsigned int seed = 1734056127;
+    srand(seed);
+    cout << "seed: " << seed << endl;
     for (int iter = 0; iter < maxIterations; ++iter) {
-        std::uniform_int_distribution<> dis(0, matches.size() - 1);
-
-        // Randomly sample 8 matches
-        std::vector<std::pair<Eigen::Vector2d, Eigen::Vector2d>> sample;
-        for (int i = 0; i < 8; ++i) {
-            sample.push_back(matches[dis(gen)]);
+        // Randomly select 8 points
+        unordered_set<int> indices;
+        while (indices.size() < sampleSize) {
+            indices.insert(rand() % numMatches);
         }
 
-        MatrixXd F = computeFundamentalMatrix(sample);
+        // Build the 8-point matrix
+        MatrixXd A(sampleSize, 9);
+        int row = 0;
+        for (int idx : indices) {
+            const auto& match = matches[idx];
+            A.row(row++) << match.first.x() * match.second.x(), match.first.y() * match.second.x(), match.second.x(),
+                            match.first.x() * match.second.y(), match.first.y() * match.second.y(), match.second.y(),
+                            match.first.x(), match.first.y(), 1.0;
+        }
+
+        // Compute SVD of A
+        JacobiSVD<MatrixXd> svd(A, ComputeFullU | ComputeFullV);
+        VectorXd f = svd.matrixV().col(8);
+
+        // Reshape f into F
+        MatrixXd F(3, 3);
+        F << f(0), f(1), f(2),
+             f(3), f(4), f(5),
+             f(6), f(7), f(8);
+
+        // Enforce rank 2 constraint
+        JacobiSVD<MatrixXd> svdF(F, ComputeFullU | ComputeFullV);
+        VectorXd s = svdF.singularValues();
+        s(2) = 0.0; // Set the smallest singular value to zero
+        F = svdF.matrixU() * s.asDiagonal() * svdF.matrixV().transpose();
 
         // Count inliers
+        vector<bool> inliers(numMatches, false);
         int inlierCount = 0;
-        for (const auto& match : matches) {
-            Eigen::Vector3d p1(match.first(0), match.first(1), 1.0);
-            Eigen::Vector3d p2(match.second(0), match.second(1), 1.0);
-            
-            double error = std::abs(p2.transpose() * F * p1);
-            if (error < threshold) {
-                ++inlierCount;
+
+        for (int i = 0; i < numMatches; ++i) {
+            const auto& match = matches[i];
+            Vector3d x1(match.first.x(), match.first.y(), 1.0);
+            Vector3d x2(match.second.x(), match.second.y(), 1.0);
+            double error = x2.transpose() * F * x1;
+            double dist = abs(error) / sqrt(pow(F(0, 0) * match.first.x() + F(0, 1) * match.first.y() + F(0, 2), 2) +
+                                            pow(F(1, 0) * match.first.x() + F(1, 1) * match.first.y() + F(1, 2), 2));
+            if (dist < threshold) {
+                inliers[i] = true;
+                inlierCount++;
             }
         }
 
-        if (inlierCount > bestInlierCount) {
-            bestInlierCount = inlierCount;
+        // Update bestF if more inliers are found
+        if (inlierCount > maxInliers) {
+            maxInliers = inlierCount;
             bestF = F;
+            bestInliers = inliers;
         }
     }
 
-    return bestF;
+    return {bestF, bestInliers};
 }

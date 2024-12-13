@@ -27,17 +27,17 @@ We’ll choose the correct pose by ensuring positive depth for the reconstructed
 Output: Rotation and translation matrices for the initial pair. *(done)*
 Deliverables: We’ll document the selection process for the correct pose. *(later)*
 
-Triangulation: *(Manya)*
-We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras. *(Manya)*
-Output: 3D point cloud for the initial image pair. *(Manya)*
-Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D. *(Manya)*
-Triangulation: *(Manya)*
+Triangulation: *(done) (Manya) and (Aryan)*
+We’ll then implement a triangulation method (e.g., Direct Linear Transform) to reconstruct 3D points from the matched inliers. We’ll ensure depth consistency and remove points that fall behind the cameras. *(done) (Manya) and (Aryan)*
+Output: 3D point cloud for the initial image pair. *(done) (Manya) and (Aryan)*
+Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D. *(done) (Manya) and (Aryan)*
+Triangulation: *(done) (Manya) and (Aryan)*
 
 #########################################################################################
 
 Week 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
 
-Incremental Image Addition:
+Incremental Image Addition: *(Manya)*
 Implement an image addition loop where new images are added based on overlapping 2D-3D correspondences.
 Estimate the new camera pose using PnP (Perspective-n-Point) with RANSAC. Triangulate new points and integrate them into the existing 3D model.
 Output: Incremental 3D point cloud with more views added.

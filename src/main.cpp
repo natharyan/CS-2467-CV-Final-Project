@@ -160,6 +160,33 @@ std::vector<cv::Point3f> denormalize3DPoints(
     return denormalized_points;
 }
 
+void savePointsToPLY(const std::vector<cv::Point3f>& points, const std::string& filename) {
+    // Open the PLY file for writing
+    std::ofstream ply_file(filename);
+
+    if (!ply_file.is_open()) {
+        std::cerr << "Could not open file " << filename << " for writing!" << std::endl;
+        return;
+    }
+
+    // Write the header of the PLY file
+    ply_file << "ply\n";
+    ply_file << "format ascii 1.0\n";
+    ply_file << "element vertex " << points.size() << "\n";
+    ply_file << "property float x\n";
+    ply_file << "property float y\n";
+    ply_file << "property float z\n";
+    ply_file << "end_header\n";
+
+    // Write the points
+    for (const auto& pt : points) {
+        ply_file << pt.x << " " << pt.y << " " << pt.z << "\n";
+    }
+
+    ply_file.close();
+    std::cout << "PLY file saved to " << filename << std::endl;
+}
+
 int main(){
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
@@ -217,7 +244,6 @@ int main(){
     cv::Mat img1_undistorted, img2_undistorted;
     cv::undistort(img1, img1_undistorted, K, distortion_coefficients);
     cv::undistort(img2, img2_undistorted, K, distortion_coefficients);
-    // TODO: getting rotation matrix determinant as 1 when I'm using images without undistortion
     // img1_undistorted = img1;
     // img2_undistorted = img2;
     // detect and compute the keypoints and descriptors
@@ -273,6 +299,7 @@ int main(){
     // check if fundamental matrix is empty
     // cout << "fundamental matrix: " << fundamental_matrix << endl;
     // convert F (MatrixXd) to cv::Mat
+    MatrixXd F = F_and_inliers.first;
     cv::Mat fundamental_matrix(F.rows(), F.cols(), CV_64F); // Create a cv::Mat of appropriate size and type
 
     // Copy data from Eigen matrix to cv::Mat
@@ -285,7 +312,7 @@ int main(){
     cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
     cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
     for(int k = 0; k < points1.size(); k++){
-        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix_opencv, points1[k], points2[k]);
+        bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix, points1[k], points2[k]);
         if(epipolar_constraint_satisfied){
             num_inliers += 1;
         }
@@ -296,11 +323,11 @@ int main(){
     }
     cout << endl;
 
-    vector<bool> inliers_mask = getInliers(fundamental_matrix_opencv, points1, points2);
+    vector<bool> inliers_mask = getInliers(fundamental_matrix, points1, points2);
 
-    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix_opencv, inliers_mask);
+    plotEpipolarLinesAndInliers(img1, img2, points1, points2, fundamental_matrix, inliers_mask);
 
-    cv::Mat E = getEssentialMatrix(fundamental_matrix_opencv, K);
+    cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
     cout << "Essential matrix: " << endl << E << endl;
     vector<pair<cv::Mat,cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
 
@@ -349,8 +376,6 @@ int main(){
     int counter = 0;
     for (pair<cv::Mat, cv::Mat> R_t : rotation_translationCandidates) {
         // normalize the translation vector 
-        // TODO: check if this is necessary
-        // R_t.second /= cv::norm(R_t.second);
         // cout << "Rotation matrix candidate " << counter << ": " << endl << R_t.first << endl;
         // cout << "Translation vector candidate " << counter << ": " << endl << R_t.second << endl;
         // construct projection matrices
@@ -401,7 +426,7 @@ int main(){
             cout << "3D point " << i << ": " << points3d[i] << endl;
     }
     // Create Viz3d window
-    cv::viz::Viz3d window("3D Points Visualization");
+    cv::viz::Viz3d window("Point Cloud Reconstruction");
     window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
@@ -443,9 +468,10 @@ int main(){
     );
     window.setViewerPose(camera_pose);
 
+    savePointsToPLY(points3d, "initial_image_pair.ply");
+
     // Start visualization
     window.spin();
 
     return 0;
 }
-// TODO: implement undistortion from scratch?

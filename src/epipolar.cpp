@@ -193,9 +193,7 @@ pair<string,string> initial_image_pair(vector<string> images){
                 points1.push_back(match.first.pt);
                 points2.push_back(match.second.pt);
             }
-            // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
-                // TODO: add fundamental matrix estimation using our ransac
                 // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 int maxIterations = 1000;
                 double threshold = 0.01;
@@ -206,8 +204,8 @@ pair<string,string> initial_image_pair(vector<string> images){
                     Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
                     eigen_matches.emplace_back(pt1, pt2);
                 }
-                MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
-
+                pair<MatrixXd, std::vector<bool>> F_and_inliers = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
+                MatrixXd F = F_and_inliers.first;
                 // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 cout << "fundamental Matrix: " << endl << F << endl;
                 // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
