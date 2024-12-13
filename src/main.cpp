@@ -160,6 +160,33 @@ std::vector<cv::Point3f> denormalize3DPoints(
     return denormalized_points;
 }
 
+void savePointsToPLY(const std::vector<cv::Point3f>& points, const std::string& filename) {
+    // Open the PLY file for writing
+    std::ofstream ply_file(filename);
+
+    if (!ply_file.is_open()) {
+        std::cerr << "Could not open file " << filename << " for writing!" << std::endl;
+        return;
+    }
+
+    // Write the header of the PLY file
+    ply_file << "ply\n";
+    ply_file << "format ascii 1.0\n";
+    ply_file << "element vertex " << points.size() << "\n";
+    ply_file << "property float x\n";
+    ply_file << "property float y\n";
+    ply_file << "property float z\n";
+    ply_file << "end_header\n";
+
+    // Write the points
+    for (const auto& pt : points) {
+        ply_file << pt.x << " " << pt.y << " " << pt.z << "\n";
+    }
+
+    ply_file.close();
+    std::cout << "PLY file saved to " << filename << std::endl;
+}
+
 int main(){
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
@@ -399,7 +426,7 @@ int main(){
             cout << "3D point " << i << ": " << points3d[i] << endl;
     }
     // Create Viz3d window
-    cv::viz::Viz3d window("3D Points Visualization");
+    cv::viz::Viz3d window("Point Cloud Reconstruction");
     window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
@@ -440,6 +467,8 @@ int main(){
         cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
+
+    savePointsToPLY(points3d, "initial_image_pair.ply");
 
     // Start visualization
     window.spin();
