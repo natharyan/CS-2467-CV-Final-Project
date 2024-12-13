@@ -66,61 +66,133 @@ vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix) 
 }
 
 // normalize the points
-tuple<cv::Point2f, double, vector<cv::Point2f>> normalizePoints(const vector<cv::Point2f>& points) {
-    cv::Point2f centroid(0, 0);
-    for (const auto& point : points) {
-        centroid.x += point.x;
-        centroid.y += point.y;
+// normalize the points with centroid and scale
+// std::tuple<cv::Point2f, double, std::vector<cv::Point2f>> normalizePoints(const std::vector<cv::Point2f>& points) {
+//     cv::Point2f centroid(0, 0);
+//     for (const auto& point : points) {
+//         centroid.x += point.x;
+//         centroid.y += point.y;
+//     }
+//     centroid.x /= points.size();
+//     centroid.y /= points.size();
+
+//     double rms_dist = 0;
+//     for (const auto& point : points) {
+//         rms_dist += cv::norm(point - centroid);
+//     }
+//     rms_dist = sqrt(rms_dist / points.size());
+
+//     double scale = sqrt(2.0) / rms_dist;
+
+//     std::vector<cv::Point2f> normalized_points;
+//     for (const auto& point : points) {
+//         normalized_points.emplace_back((point - centroid) * scale);
+//     }
+
+//     return {centroid, scale, normalized_points};
+// }
+
+// normalization with intrinsice matrix
+tuple<cv::Point2f, double, std::vector<cv::Point2f>> normalizePoints(const vector<cv::Point2f>& points, const cv::Mat& K) {
+    // Ensure K is a 3x3 matrix
+    if (K.rows != 3 || K.cols != 3) {
+        throw std::invalid_argument("Intrinsic matrix K must be 3x3");
     }
+
+    // Extract intrinsic parameters
+    double fx = K.at<double>(0, 0); // Focal length in x
+    double fy = K.at<double>(1, 1); // Focal length in y
+    double u0 = K.at<double>(0, 2); // Principal point x
+    double v0 = K.at<double>(1, 2); // Principal point y
+
+    vector<cv::Point2f> normalizedPoints;
+    cv::Point2f centroid(0, 0);
+    double scaleFactor = 0;
+
+    // Normalize each point
+    for (const auto& pt : points) {
+        double x_norm = (pt.x - u0) / fx;
+        double y_norm = (pt.y - v0) / fy;
+
+        cv::Point2f norm_pt(x_norm, y_norm);
+        normalizedPoints.push_back(norm_pt);
+
+        // Accumulate centroid
+        centroid.x += norm_pt.x;
+        centroid.y += norm_pt.y;
+    }
+
+    // Compute centroid
     centroid.x /= points.size();
     centroid.y /= points.size();
 
-    double rms_dist = 0;
-    for (const auto& point : points) {
-        rms_dist += cv::norm(point - centroid);
-    }
-    rms_dist = sqrt(rms_dist / points.size());
-
-    double scale = sqrt(2.0) / rms_dist;
-
-    vector<cv::Point2f> normalized_points;
-    for (const auto& point : points) {
-        normalized_points.emplace_back((point - centroid) * scale);
+    // Compute average scale (distance from centroid to points)
+    double totalScale = 0.0;
+    for (const auto& norm_pt : normalizedPoints) {
+        totalScale += std::sqrt(std::pow(norm_pt.x - centroid.x, 2) + std::pow(norm_pt.y - centroid.y, 2));
     }
 
-    return {centroid, scale, normalized_points};
+    scaleFactor = totalScale / points.size();
+
+    return {centroid, scaleFactor, normalizedPoints};
 }
 
-// denormalize the points
-vector<cv::Point3f> denormalize3DPoints(
-    const vector<cv::Point3f>& points,
-    const cv::Point2f& centroid, double scale) {
+// denormalize the points with the centroid and scale
+// std::vector<cv::Point3f> denormalize3DPoints(
+//     const std::vector<cv::Point3f>& points,
+//     const cv::Point2f& centroid, double scale) {
 
-    vector<cv::Point3f> denormalized_points;
-    for (const auto& point : points) {
-        denormalized_points.emplace_back(
-            point.x / scale + centroid.x,
-            point.y / scale + centroid.y,
-            point.z * scale); // Scale depth appropriately
+//     std::vector<cv::Point3f> denormalized_points;
+//     for (const auto& point : points) {
+//         denormalized_points.emplace_back(
+//             point.x / scale + centroid.x,
+//             point.y / scale + centroid.y,
+//             point.z * scale); // Scale depth appropriately
+//     }
+//     return denormalized_points;
+// }
+
+// denormalization with intrinsic matrix
+vector<cv::Point3f> denormalize3DPoints(const vector<cv::Point3f>& normalizedPoints, const cv::Mat& K) {
+    // Ensure K is a 3x3 matrix
+    if (K.rows != 3 || K.cols != 3) {
+        throw std::invalid_argument("Intrinsic matrix K must be 3x3");
     }
-    return denormalized_points;
+
+    // Extract intrinsic parameters
+    double fx = K.at<double>(0, 0); // Focal length in x
+    double fy = K.at<double>(1, 1); // Focal length in y
+    double u0 = K.at<double>(0, 2); // Principal point x
+    double v0 = K.at<double>(1, 2); // Principal point y
+
+    std::vector<cv::Point3f> denormalizedPoints;
+
+    for (const auto& pt : normalizedPoints) {
+        double x_denorm = fx * pt.x + u0;
+        double y_denorm = fy * pt.y + v0;
+        double z_denorm = pt.z; // z-coordinate remains unchanged
+
+        denormalizedPoints.emplace_back(x_denorm, y_denorm, z_denorm);
+    }
+
+    return denormalizedPoints;
 }
 
 vector<cv::Point3f> performDenseReconstruction(
-    const cv::Mat& img1, const cv::Mat& img2, 
-    const cv::Mat& fundamental_matrix, const cv::Mat& K, 
-    const vector<cv::Point2f>& points1, const vector<cv::Point2f>& points2, 
+    const cv::Mat& img1, const cv::Mat& img2,
+    const cv::Mat& fundamental_matrix, const cv::Mat& K,
+    const vector<cv::Point2f>& points1, const vector<cv::Point2f>& points2,
     const cv::Mat& R, const cv::Mat& t) {
 
     vector<cv::Point3f> dense_points;
 
-    // Projection matrices
+    // projection matrices
     cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
     cv::Mat Rt_combined;
-    cv::hconcat(R, t, Rt_combined); // Combine R and t
-    cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
+    cv::hconcat(R, t, Rt_combined); // combine R and t
+    cv::Mat P2 = K * Rt_combined;   // P2 = K * [R | t]
 
-    for (int y = 0; y < img1.rows; y += 10) { // Adjust step size as needed
+    for (int y = 0; y < img1.rows; y += 10) { // adjust step size as needed
         for (int x = 0; x < img1.cols; x += 10) {
             cv::Point2f ref_point(x, y);
             cv::Mat line = fundamental_matrix * (cv::Mat_<double>(3, 1) << ref_point.x, ref_point.y, 1);
@@ -133,16 +205,16 @@ vector<cv::Point3f> performDenseReconstruction(
             cv::Point2f best_match;
             bool found_match = false;
 
-            // Search for the best match in the second image along the epipolar line
+            // search for the best match in the second image along the epipolar line
             for (int u = max(0, x - 100); u < min(img2.cols, x + 100); ++u) {
                 int v = round(-(a * u + c) / b);
                 if (v < 0 || v >= img2.rows) continue;
 
                 double ssd = 0;
                 bool valid_patch = true;
-                int patch_size = 10;  // Smaller patch size to avoid invalid memory access
+                int patch_size = 10;  // smaller patch size to avoid invalid memory access
 
-                // Calculate the sum of squared differences (SSD) between patches
+                // calculate the sum of squared differences (SSD) between patches
                 for (int dy = -patch_size / 2; dy <= patch_size / 2; ++dy) {
                     for (int dx = -patch_size / 2; dx <= patch_size / 2; ++dx) {
                         int x1 = x + dx, y1 = y + dy;
@@ -168,24 +240,26 @@ vector<cv::Point3f> performDenseReconstruction(
             }
 
             if (found_match) {
-                // Normalize points for triangulation
-                vector<cv::Point2f> norm_points1, norm_points2;
-                cv::undistortPoints(vector<cv::Point2f>{ref_point}, norm_points1, K, cv::noArray());
-                cv::undistortPoints(vector<cv::Point2f>{best_match}, norm_points2, K, cv::noArray());
+                // normalize points using camera intrinsics
+                auto [centroid1, scale1, norm_points1] = normalizePoints(vector<cv::Point2f>{ref_point}, K);
+                auto [centroid2, scale2, norm_points2] = normalizePoints(vector<cv::Point2f>{best_match}, K);
 
-                // Triangulate the 3D point
+                // triangulate the 3D point
                 cv::Mat point4D;
                 cv::triangulatePoints(P1, P2, norm_points1, norm_points2, point4D);
 
-                // Convert homogeneous coordinates to 3D
+                // convert homogeneous coordinates to 3D
                 cv::Point3f point;
                 point.x = point4D.at<float>(0) / point4D.at<float>(3);
                 point.y = point4D.at<float>(1) / point4D.at<float>(3);
                 point.z = point4D.at<float>(2) / point4D.at<float>(3);
 
-                if (point.z > 0) { // Consider points with positive depth
-                    cout << "Found a matched 3D point!: " << point << endl;
-                    dense_points.push_back(point);
+                if (point.z > 0) { // consider points with positive depth
+                    // denormalize the point using camera intrinsics
+                    // print triangulated a matched 3d point!
+                    cout << "triangulated a matched 3d point! " << point << endl;
+                    auto denormalized_points = denormalize3DPoints(vector<cv::Point3f>{point}, K);
+                    dense_points.push_back(denormalized_points[0]);
                 }
             }
         }
@@ -228,7 +302,7 @@ int main(){
             FLAG_initial_image_pair = false;
         }
     }else{
-        string img_path = "dataset/Book Statue";
+        string img_path = "dataset/Book Statue/";
         vector<string> images;
 
         for (const auto & entry : fs::directory_iterator(img_path))
@@ -317,8 +391,8 @@ int main(){
         }
     }
     
-    cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
-    cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
+    // cout << "fundamental matrix(opencv): " << endl << fundamental_matrix_opencv << endl;
+    // cout << "fundamental matrix: " << endl << fundamental_matrix << endl;
     for(int k = 0; k < points1.size(); k++){
         bool epipolar_constraint_satisfied = epipolar_contraint(fundamental_matrix_opencv, points1[k], points2[k]);
         if(epipolar_constraint_satisfied){
@@ -343,8 +417,8 @@ int main(){
     vector<cv::Point2f> norm_points1, norm_points2;
     cv::Point2f centroid1, centroid2;
     double scale1, scale2;
-    tie(centroid1, scale1, norm_points1) = normalizePoints(points1);
-    tie(centroid2, scale2, norm_points2) = normalizePoints(points2);
+    tie(centroid1, scale1, norm_points1) = normalizePoints(points1,K);
+    tie(centroid2, scale2, norm_points2) = normalizePoints(points2,K);
     
     // norm_points1 = normalizePoints(points1, K);
     // norm_points2 = normalizePoints(points2, K);
@@ -430,7 +504,8 @@ int main(){
     }
 
     // denormalize the 3d points
-    points3d = denormalize3DPoints(points3d, centroid1, scale1);
+    // points3d = denormalize3DPoints(points3d, centroid1, scale1);
+    points3d = denormalize3DPoints(points3d, K);
     cout << "Denormalized 3D points: " << endl;
     for (int i = 0; i < points3d.size(); i++) {
             cout << "3D point: " << points3d[i] << endl;
@@ -442,20 +517,20 @@ int main(){
 
     vector<cv::Point3f> dense_points = performDenseReconstruction(img1, img2, fundamental_matrix_opencv, K, points1, points2,R,t);
     cout << "Number of dense points: " << dense_points.size() << endl;
-    // Create Viz3d window
+    // create Viz3d window
     cv::viz::Viz3d window("3D Points Visualization");
     window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
-    // Create point cloud widget
+    // create point cloud widget
     cv::viz::WCloud cloud_widget(dense_points, cv::viz::Color::white());
     cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 5.0);
 
-    // Show the point cloud widget
+    // show the point cloud widget
     window.showWidget("point_cloud", cloud_widget);
 
-    // Set camera pose to view the point cloud
-    // Find the center of the point cloud
+    // set camera pose to view the point cloud
+    // find the center of the point cloud
     cv::Point3d center(0, 0, 0);
     for (const auto& pt : dense_points) {
         center.x += pt.x;
@@ -466,7 +541,7 @@ int main(){
     center.y /= dense_points.size();
     center.z /= dense_points.size();
 
-    // Compute max distance from center to determine camera distance
+    // compute max distance from center to determine camera distance
     double max_dist = 0;
     for (const auto& pt : dense_points) {
         double dist = sqrt(
@@ -477,17 +552,15 @@ int main(){
         max_dist = max(max_dist, dist);
     }
 
-    // Set camera pose to look at the center of the point cloud
+    // set camera pose to look at the center of the point cloud
     cv::Affine3d camera_pose = cv::viz::makeCameraPose(
         cv::Vec3d(center.x, center.y, center.z + max_dist * 2),  // Camera position
         cv::Vec3d(center.x, center.y, center.z),  // Look at center
         cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
-    cv::viz::writeCloud("initial_image_pair_dense.ply", dense_points);
-    // Start visualization
+    cv::viz::writeCloud("initial_image_pair_dense_BookStatue.ply", dense_points);
     window.spin();
 
     return 0;
 }
-// TODO: implement undistortion from scratch?

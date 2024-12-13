@@ -594,9 +594,7 @@ int main(){
     );
     window.setViewerPose(camera_pose);
     cv::viz::writeCloud("point_cloud.ply", points3d);
-    // Start visualization
     window.spin();
 
     return 0;
 }
-// TODO: implement undistortion from scratch?
