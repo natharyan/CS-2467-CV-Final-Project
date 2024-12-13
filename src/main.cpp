@@ -120,29 +120,42 @@ pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
 }
 
 // normalize the points
-vector<cv::Point2f> normalizePoints(vector<cv::Point2f> points, cv::Mat K){
-    vector<cv::Point2f> normalized_points;
-    for(auto point : points){
-        cv::Point2f normalized_point;
-        normalized_point.x = (point.x - K.at<double>(0, 2)) / K.at<double>(0, 0);
-        normalized_point.y = (point.y - K.at<double>(1, 2)) / K.at<double>(1, 1);
-        normalized_points.push_back(normalized_point);
+std::tuple<cv::Point2f, double, std::vector<cv::Point2f>> normalizePoints(const std::vector<cv::Point2f>& points) {
+    cv::Point2f centroid(0, 0);
+    for (const auto& point : points) {
+        centroid.x += point.x;
+        centroid.y += point.y;
     }
-    return normalized_points;
+    centroid.x /= points.size();
+    centroid.y /= points.size();
+
+    double rms_dist = 0;
+    for (const auto& point : points) {
+        rms_dist += cv::norm(point - centroid);
+    }
+    rms_dist = sqrt(rms_dist / points.size());
+
+    double scale = sqrt(2.0) / rms_dist;
+
+    std::vector<cv::Point2f> normalized_points;
+    for (const auto& point : points) {
+        normalized_points.emplace_back((point - centroid) * scale);
+    }
+
+    return {centroid, scale, normalized_points};
 }
 
 // denormalize the points
-std::vector<cv::Point3f> denormalizePoints(const std::vector<cv::Point3f>& points, const cv::Mat& K) {
+std::vector<cv::Point3f> denormalize3DPoints(
+    const std::vector<cv::Point3f>& points,
+    const cv::Point2f& centroid, double scale) {
+
     std::vector<cv::Point3f> denormalized_points;
     for (const auto& point : points) {
-        cv::Point3f denormalized_point;
-
-        // Denormalize using the intrinsic matrix K and scaling by Z
-        denormalized_point.x = point.x * point.z * K.at<double>(0, 0) + K.at<double>(0, 2) * point.z;
-        denormalized_point.y = point.y * point.z * K.at<double>(1, 1) + K.at<double>(1, 2) * point.z;
-        denormalized_point.z = point.z; // Z remains the depth
-
-        denormalized_points.push_back(denormalized_point);
+        denormalized_points.emplace_back(
+            point.x / scale + centroid.x,
+            point.y / scale + centroid.y,
+            point.z * scale); // Scale depth appropriately
     }
     return denormalized_points;
 }
@@ -161,8 +174,8 @@ int main(){
     // cout << "Camera intrinsics: " << endl << K << endl;
     // cout << "Distortion coefficients: " << endl << distortion_coefficients << endl;
 
-    //K = [[3.04690978e+03 0.00000000e+00 1.58798925e+03] [0.00000000e+00 3.04241561e+03 1.52143054e+03] [0.00000000e+00 0.00000000e+00 1.00000000e+00]]
-    // distortion_coefficients = [[ 3.92176156e-02 -4.71862125e-01  1.37646274e-03  4.51593168e-04 1.81876525e+00]]
+    // K =   [[3.04690978e+03 0.00000000e+00 1.58798925e+03] [0.00000000e+00 3.04241561e+03 1.52143054e+03] [0.00000000e+00 0.00000000e+00 1.00000000e+00]]
+    // distortion coefficients:  [[ 3.92176156e-02 -4.71862125e-01  1.37646274e-03  4.51593168e-04 1.81876525e+00]]
     cv::Mat K = (cv::Mat_<double>(3, 3) << 3.04690978e+03, 0.00000000e+00, 1.58798925e+03, 0.00000000e+00, 3.04241561e+03, 1.52143054e+03, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00);
     cv::Mat distortion_coefficients = (cv::Mat_<double>(1, 5) << 3.92176156e-02, -4.71862125e-01, 1.37646274e-03, 4.51593168e-04, 1.81876525e+00);
 
@@ -244,7 +257,6 @@ int main(){
     cout << endl;
     // plot the epipolar lines and inliers for the initial image pair
     int num_inliers = 0;
-    // TODO: implement fundamental matrix using ransac from scratch
     int maxIterations = 1000;
     double threshold = 0.01;
 
@@ -254,7 +266,7 @@ int main(){
         Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
         eigen_matches.emplace_back(pt1, pt2);
     }
-
+    // TODO: fix ransac fundamental matrix
     MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
     cv::Mat fundamental_matrix_opencv = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
     // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
@@ -294,8 +306,13 @@ int main(){
 
     // Normalize points to image coordinates using K
     vector<cv::Point2f> norm_points1, norm_points2;
-    norm_points1 = normalizePoints(points1, K);
-    norm_points2 = normalizePoints(points2, K);
+    cv::Point2f centroid1, centroid2;
+    double scale1, scale2;
+    std::tie(centroid1, scale1, norm_points1) = normalizePoints(points1);
+    std::tie(centroid2, scale2, norm_points2) = normalizePoints(points2);
+    
+    // norm_points1 = normalizePoints(points1, K);
+    // norm_points2 = normalizePoints(points2, K);
     // for (const auto& pt : points1) {
     //     float x = (pt.x - K.at<double>(0, 2)) / K.at<double>(0, 0); // Normalize x
     //     float y = (pt.y - K.at<double>(1, 2)) / K.at<double>(1, 1); // Normalize y
@@ -349,7 +366,7 @@ int main(){
         // cv::Mat P = K * RT;                         // Compute the projection matrix
         // triangulate points
         points3d = triangulation(P1, P2, norm_points1, norm_points2);
-
+    
         // check cheirality condition
         bool cheirality = true;
         for (cv::Point3d point3d : points3d) {
@@ -369,6 +386,7 @@ int main(){
 
     cout << "Rotation matrix: " << endl << R << endl;
     cout << "Translation vector: " << endl << t*cv::norm(t) << endl;
+    cout << "Translation vector norm: " << cv::norm(t) << endl;
 
     cout << "3d points: " << points3d.size() << endl;
     // 3d points
@@ -377,27 +395,51 @@ int main(){
     }
 
     // denormalize the 3d points
-    points3d = denormalizePoints(points3d, K);
+    points3d = denormalize3DPoints(points3d, centroid1, scale1);
     cout << "Denormalized 3D points: " << endl;
     for (int i = 0; i < points3d.size(); i++) {
             cout << "3D point " << i << ": " << points3d[i] << endl;
     }
     // Create Viz3d window
-    cv::viz::Viz3d window("3D Points");
-    window.setWindowSize(cv::Size(1500, 1500));
-    window.setWindowPosition(cv::Point(150, 150));
+    cv::viz::Viz3d window("3D Points Visualization");
+    window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
-    // Add point cloud widget
+    // Create point cloud widget
     cv::viz::WCloud cloud_widget(points3d, cv::viz::Color::white());
-    cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 20.0); // Set point size
+    cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 10.0);
+
+    // Show the point cloud widget
     window.showWidget("point_cloud", cloud_widget);
 
-    // Set camera pose
+    // Set camera pose to view the point cloud
+    // Find the center of the point cloud
+    cv::Point3d center(0, 0, 0);
+    for (const auto& pt : points3d) {
+        center.x += pt.x;
+        center.y += pt.y;
+        center.z += pt.z;
+    }
+    center.x /= points3d.size();
+    center.y /= points3d.size();
+    center.z /= points3d.size();
+
+    // Compute max distance from center to determine camera distance
+    double max_dist = 0;
+    for (const auto& pt : points3d) {
+        double dist = std::sqrt(
+            std::pow(pt.x - center.x, 2) +
+            std::pow(pt.y - center.y, 2) +
+            std::pow(pt.z - center.z, 2)
+        );
+        max_dist = std::max(max_dist, dist);
+    }
+
+    // Set camera pose to look at the center of the point cloud
     cv::Affine3d camera_pose = cv::viz::makeCameraPose(
-        cv::Vec3d(0, 0, -5), // Camera position
-        cv::Vec3d(0, 0, 0),  // Look at origin
-        cv::Vec3d(0, -1, 0)  // Up vector
+        cv::Vec3d(center.x, center.y, center.z + max_dist * 2),  // Camera position
+        cv::Vec3d(center.x, center.y, center.z),  // Look at center
+        cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
 
