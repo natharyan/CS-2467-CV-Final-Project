@@ -18,91 +18,62 @@ using Eigen::ComputeFullV;
 
 using namespace std;
 
+
 pair<vector<cv::KeyPoint>,cv::Mat> runORB(const string& imgpath){
     cv::Mat baseImage;
     baseImage = createBaseImage(imgpath);
     cout << "ORB running..." << endl;
-    // cv::imshow("Base Image", baseImage);
-    // cv::waitKey(1);
-    // cv::destroyAllWindows();
-    // calling FAST9 
-    cout << "running" << endl;
-    vector<cv::Point> initialKeypoints = FAST9(baseImage, 40);
+    vector<cv::KeyPoint> initialKeypoints = FAST9(baseImage, 20);
     cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
-    // harris corner response 
+
     vector<KeypointWithResponse> keypointsWithResponses;
-    for (const cv::Point& kp : initialKeypoints) {
+    for (const auto& kp : initialKeypoints) {
         double response = harrisResponse(baseImage, kp);
-        // cout << "response: " << response << endl;
-        // Retain only the keypoints with a Harris response greater than 0.01
         if (response > 0.01) { 
             keypointsWithResponses.push_back({kp, response});
         }
     }
-    // Sort the keypoints based on Harris response
+
+    cout << keypointsWithResponses.size() << endl; 
+
     sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
-        return a.harrisResponse > b.harrisResponse;
+        return a.harrisResponse < b.harrisResponse;
     });
-    // Retain only the top N keypoints
-    const int maxKeypoints = 500;
+
+    const int maxKeypoints =1000;
     if (keypointsWithResponses.size() > maxKeypoints) {
         keypointsWithResponses.resize(maxKeypoints);
     }
+
     cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
-    // Extract the keypoints and compute orientations
+
     vector<cv::KeyPoint> filteredKeypoints;
     vector<double> orientations;
     for (const auto& kpWithResponse : keypointsWithResponses) {
-        filteredKeypoints.push_back(cv::KeyPoint(kpWithResponse.point, 1.0f));
-        orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
+        cv::KeyPoint kp = kpWithResponse.point;
+        kp.angle = orientationAssignment(baseImage, kp);
+        filteredKeypoints.push_back(kp);
     }
-    // cout << filteredKeypoints << endl; 
-    vector<cv::KeyPoint> cvKeypoints;
-    for (const auto& point : filteredKeypoints) {
-        cv::KeyPoint kp(point.pt.x, point.pt.y, 31); // Set patch size (31 as example)
-        cvKeypoints.push_back(kp);
-    }
-    // Compute rBRIEF descriptors
-    vector<cv::Point> keypointPoints;
-    for (const auto& kp : filteredKeypoints) {
-        keypointPoints.push_back(kp.pt);
-    }
-    cv::Mat descriptors = rBRIEF(baseImage, keypointPoints, 31);
+    cout << filteredKeypoints.size() << endl; 
 
-    // vector<cv::Mat> descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
-    // cout << "Descriptors computed using rBRIEF." << endl;
-    // Visualize the keypoints
+    cv::Mat descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
+    cout << "Descriptors computed using rBRIEF." << endl;
+
     cv::Mat displayImage;
     cvtColor(baseImage, displayImage, cv::COLOR_GRAY2BGR);  
-    // Display keypoints on the image
+
     cv::Mat imgWithKeypoints;
-        // Print the descriptors
-    // cout << "Descriptors (first 5 descriptors):" << endl;
-    // for (size_t i = 0; i < std::min(descriptors.size(), (size_t)5); ++i) {
-    //     cout << "Descriptor " << i << ": " << descriptors[i] << endl;
-    // }
-    // cout << descriptors.size() << endl;
-    // cout << "done" << endl;
-    // // Show the image with keypoints
-    // drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
-    // cout << "img keypoints size: " << imgWithKeypoints.size() << endl;
-    // cv::imshow("Keypoints", imgWithKeypoints);
-    // cv::waitKey(1);
-    // cout << "done" << endl;
-    // Print the descriptors
-    // cout << "Descriptors (first 5 descriptors):" << endl;
-    // for (size_t i = 0; i < min(descriptors.rows, 5); ++i) {
-    //     cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
-    // }
-    // cout << descriptors.size() << endl;
-    // cout << "done" << endl;
-    // cv::imshow("Filtered Keypoints with Orientations", displayImage);
-    // cv::waitKey(1);
-    // cv::destroyAllWindows();
+    drawKeypoints(baseImage, filteredKeypoints, imgWithKeypoints, cv::Scalar(0, 255, 0), cv::DrawMatchesFlags::DEFAULT);
+
+    cout << "img with keypoints size: " << imgWithKeypoints.size() << endl;
+    cv::imshow("Keypoints", imgWithKeypoints);
+    cv::waitKey(1);
+    cout << "done" << endl;
+
     cout << "ORB pipeline completed successfully." << endl;
 
-    return {filteredKeypoints,descriptors};
-}
+    return {filteredKeypoints, descriptors};
+};
 
 // get the epipolar lines using the fundamental matrix and the matched keypoints from the first image in the pair selected
 cv::Mat epipolar_line(cv::Mat fundamental_matrix, cv::Point2d keypoint1){
@@ -193,7 +164,9 @@ pair<string,string> initial_image_pair(vector<string> images){
                 points1.push_back(match.first.pt);
                 points2.push_back(match.second.pt);
             }
+            // TODO: implement fundamental matrix using ransac
             if (points1.size() >= 8 && points2.size() >= 8) { //minimum for RANSAC
+                // TODO: add fundamental matrix estimation using our ransac
                 // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 int maxIterations = 1000;
                 double threshold = 0.01;
@@ -204,8 +177,8 @@ pair<string,string> initial_image_pair(vector<string> images){
                     Eigen::Vector2d pt2(match.second.pt.x, match.second.pt.y);
                     eigen_matches.emplace_back(pt1, pt2);
                 }
-                pair<MatrixXd, std::vector<bool>> F_and_inliers = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
-                MatrixXd F = F_and_inliers.first;
+                auto [F, inliers] = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
+
                 // cv::Mat fundamental_matrix = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
                 cout << "fundamental Matrix: " << endl << F << endl;
                 // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;

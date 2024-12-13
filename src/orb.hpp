@@ -12,16 +12,16 @@ using namespace std;
 
 cv::Mat createBaseImage(const std::string& imagePath);
 
-std::vector<cv::Point> FAST9(const cv::Mat& image, int threshold);
+std::vector<cv::KeyPoint> FAST9(const cv::Mat& image, int threshold);
 
-double orientationAssignment(const cv::Mat& image, const cv::Point& keypoint, int patchSize = 7);
+double orientationAssignment(const cv::Mat& image, const cv::KeyPoint& keypoint, int patchSize = 7);
 
-double harrisResponse(const cv::Mat& image, const cv::Point& keypoint, int blockSize = 3, double k = 0.04);
+double harrisResponse(const cv::Mat& gray, const cv::KeyPoint& keypoint, int blockSize = 3, double k = 0.04) ;
 
-cv::Mat rBRIEF(const cv::Mat& image, const std::vector<cv::Point>& keypoints, int patchSize = 31);
+cv::Mat rBRIEF(const cv::Mat& image, vector<cv::KeyPoint>& keypoints, int patchSize = 31) ;
 
 struct KeypointWithResponse {
-    cv::Point point;
+    cv::KeyPoint point;
     double harrisResponse;
 };
 

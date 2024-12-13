@@ -13,6 +13,7 @@ using namespace std;
 
 // Bit patterns from opencv/modules/features2d/src/orb.cpp for faster computation
 
+
 // create base image 
 cv::Mat createBaseImage(const string& imagePath)
 {
@@ -29,8 +30,8 @@ cv::Mat createBaseImage(const string& imagePath)
 
 // FAST to detect keypoints
 
-vector<Point> FAST9(const Mat& image, int threshold){
-    vector<Point> keypoints;
+vector<cv::KeyPoint> FAST9(const Mat& image, int threshold){
+    vector<cv::KeyPoint> keypoints;
     // Convert image to grayscale if it's not already
     Mat gray;
     if (image.channels() == 3) {
@@ -72,7 +73,7 @@ vector<Point> FAST9(const Mat& image, int threshold){
             // If 3 or more pixels are brighter or darker than the center, mark it as a corner
             if (countBright >= 3 || countDark >= 3) {
                 // Store the keypoint (x, y)
-                keypoints.push_back(Point(j, i));  
+                keypoints.push_back(cv::KeyPoint(j, i, 1.0));  
             }
         }
     }
@@ -82,7 +83,7 @@ vector<Point> FAST9(const Mat& image, int threshold){
 
 // Orientation assignment 
 
-double orientationAssignment(const Mat& image, const Point& keypoint, int patchSize = 7) {
+double orientationAssignment(const Mat& image, const KeyPoint& keypoint, int patchSize = 7) {
     // Initialize moments
     double m_10 = 0.0;
     double m_01 = 0.0;
@@ -95,8 +96,8 @@ double orientationAssignment(const Mat& image, const Point& keypoint, int patchS
     // Loop over the patch around the keypoint to compute moments
     for (int dx = -radius; dx <= radius; ++dx) {
         for (int dy = -radius; dy <= radius; ++dy) {
-            int x = keypoint.x + dx;
-            int y = keypoint.y + dy;
+            int x = keypoint.pt.x + dx;
+            int y = keypoint.pt.y + dy;
 
             if (x >= 0 && x < cols && y >= 0 && y < rows) {
                 // Pixel intensity as weight
@@ -117,7 +118,7 @@ double orientationAssignment(const Mat& image, const Point& keypoint, int patchS
 }
 
 // Harris 
-double harrisResponse(const Mat& gray, const Point& keypoint, int blockSize = 3, double k = 0.04) {
+double harrisResponse(const Mat& gray, const cv::KeyPoint& keypoint, int blockSize = 3, double k = 0.04) {
     int radius = blockSize / 2;
     double sumIx2 = 0.0, sumIy2 = 0.0, sumIxy = 0.0;
 
@@ -127,8 +128,8 @@ double harrisResponse(const Mat& gray, const Point& keypoint, int blockSize = 3,
 
     for (int dx = -radius; dx <= radius; ++dx) {
         for (int dy = -radius; dy <= radius; ++dy) {
-            int x = keypoint.x + dx;
-            int y = keypoint.y + dy;
+            int x = keypoint.pt.x + dx;
+            int y = keypoint.pt.y + dy;
 
             if (x >= 1 && x < gray.cols - 1 && y >= 1 && y < gray.rows - 1) {
                 // Floating-point gradients for more precision
@@ -161,13 +162,14 @@ double harrisResponse(const Mat& gray, const Point& keypoint, int blockSize = 3,
 }
 
 // rBRIEF 
-cv::Mat rBRIEF(const Mat& image, const vector<Point>& keypoints, int patchSize = 31) {
+cv::Mat rBRIEF(const Mat& image, vector<cv::KeyPoint>& keypoints, int patchSize = 31) {
 
-    // Create a binary pattern generator (random sampling of pixel pairs)
-    // The size (32 bytes = 256 bits) is set in the constructor
+    Ptr<ORB> orb = ORB::create(500);
+    Mat descriptors;
+    
+
     Ptr<xfeatures2d::BriefDescriptorExtractor> briefExtractor = xfeatures2d::BriefDescriptorExtractor::create(32);
 
-    // Convert the image to a format suitable for keypoint extraction (e.g., grayscale)
     Mat gray;
     if (image.channels() == 3) {
         cvtColor(image, gray, COLOR_BGR2GRAY);
@@ -175,29 +177,27 @@ cv::Mat rBRIEF(const Mat& image, const vector<Point>& keypoints, int patchSize =
         gray = image;
     }
 
-    // Detect keypoints using FAST (or you can pass pre-detected keypoints)
-    vector<KeyPoint> cvKeypoints;
+    vector<cv::KeyPoint> cvKeypoints;
     for (const auto& point : keypoints) {
-        KeyPoint kp(point.x, point.y, patchSize); // Assuming a patch size, can be changed
+        KeyPoint kp(point.pt.x, point.pt.y, patchSize, point.angle); // Use the orientation
         cvKeypoints.push_back(kp);
     }
 
-    // Extract BRIEF descriptors for the keypoints
+    // opencv check 
+    orb->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
+
     Mat descriptorsMat;
     briefExtractor->compute(gray, cvKeypoints, descriptorsMat);
 
-    // Check if the descriptors were successfully computed
     if (descriptorsMat.empty()) {
         cerr << "Error: No descriptors were computed." << endl;
     }
 
-    return descriptorsMat;
+    return descriptors;
 }
 
-
-
 struct KeypointWithResponse {
-    Point point;
+    cv::KeyPoint point;
     double harrisResponse;
 };
 
@@ -206,19 +206,13 @@ struct KeypointWithResponse {
 //     cv::Mat baseImage;
 //     baseImage = createBaseImage(imgpath);
 //     cout << "SIFT running..." << endl;
-//     // cv::imshow("Base Image", baseImage);
-//     // cv::waitKey(0);
-//     // cv::destroyAllWindows();
-//     // calling FAST9 
-//     cout << "running" << endl;
-//     vector<Point> initialKeypoints = FAST9(baseImage, 20);
+//     // ...existing code...
+//     vector<cv::KeyPoint> initialKeypoints = FAST9(baseImage, 20);
 //     cout << "Number of keypoints detected by FAST9: " << initialKeypoints.size() << endl;
 
-//     // harris corner response 
 //     vector<KeypointWithResponse> keypointsWithResponses;
-//     for (const Point& kp : initialKeypoints) {
+//     for (const auto& kp : initialKeypoints) {
 //         double response = harrisResponse(baseImage, kp);
-//         // Retain only the keypoints with a Harris response greater than 0.01
 //         if (response > 0.01) { 
 //             keypointsWithResponses.push_back({kp, response});
 //         }
@@ -226,12 +220,10 @@ struct KeypointWithResponse {
 
 //     cout << keypointsWithResponses.size() << endl; 
 
-//     // Sort the keypoints based on Harris response
 //     sort(keypointsWithResponses.begin(), keypointsWithResponses.end(), [](const KeypointWithResponse& a, const KeypointWithResponse& b) {
 //         return a.harrisResponse < b.harrisResponse;
 //     });
 
-//     // Retain only the top N keypoints
 //     const int maxKeypoints =1000;
 //     if (keypointsWithResponses.size() > maxKeypoints) {
 //         keypointsWithResponses.resize(maxKeypoints);
@@ -239,38 +231,27 @@ struct KeypointWithResponse {
 
 //     cout << "Number of keypoints after Harris filtering: " << keypointsWithResponses.size() << endl;
 
-//     // Extract the keypoints and compute orientations
-//     vector<Point> filteredKeypoints;
+//     vector<cv::KeyPoint> filteredKeypoints;
 //     vector<double> orientations;
 //     for (const auto& kpWithResponse : keypointsWithResponses) {
-//         filteredKeypoints.push_back(kpWithResponse.point);
-//         orientations.push_back(orientationAssignment(baseImage, kpWithResponse.point));
+//         cv::KeyPoint kp = kpWithResponse.point;
+//         kp.angle = orientationAssignment(baseImage, kp);
+//         filteredKeypoints.push_back(kp);
 //     }
-//     cout << filteredKeypoints << endl; 
+//     cout << filteredKeypoints.size() << endl; 
 
-//     vector<KeyPoint> cvKeypoints;
-//     for (const auto& point : filteredKeypoints) {
-//         KeyPoint kp(point.x, point.y, 31); // Set patch size (31 as example)
-//         cvKeypoints.push_back(kp);
-//     }
-
-//     // Compute rBRIEF descriptors
 //     cv::Mat descriptors = rBRIEF(baseImage, filteredKeypoints, 31);
 //     cout << "Descriptors computed using rBRIEF." << endl;
 
-//     // Visualize the keypoints
 //     cv::Mat displayImage;
 //     cvtColor(baseImage, displayImage, COLOR_GRAY2BGR);  
 
-//     // Display keypoints on the image
 //     Mat imgWithKeypoints;
-//     drawKeypoints(baseImage, cvKeypoints, imgWithKeypoints, Scalar(0, 255, 0), DrawMatchesFlags::DEFAULT);
+//     drawKeypoints(baseImage, filteredKeypoints, imgWithKeypoints, Scalar(0, 255, 0), DrawMatchesFlags::DEFAULT);
 
-//     // Show the image with keypoints
 //     imshow("Keypoints", imgWithKeypoints);
 //     waitKey(0);
 
-//     // Print the descriptors
 //     cout << "Descriptors (first 5 descriptors):" << endl;
 //     for (int i = 0; i < min(descriptors.rows, 5); ++i) {
 //         cout << "Descriptor " << i << ": " << descriptors.row(i) << endl;
