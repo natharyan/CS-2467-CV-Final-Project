@@ -260,6 +260,10 @@ tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(co
     cout << "Number of points_curr: " << points_curr.size() << endl;
     cout << "Image 1 size: " << prev_img.size() << endl;
     cout << "Image 2 size: " << cur_img.size() << endl;
+    if(points_prev.size() == 0 || points_curr.size() == 0){
+        cout << "No matches found." << endl;
+        return make_tuple(points3d_prev, keypoints_prev, descriptors_prev);
+    }
     plotMatches(prev_img, cur_img, matches);
     cout << "Matches plotted." << endl;
     // Estimate the fundamental matrix using RANSAC
@@ -346,7 +350,7 @@ int main(){
     cv::Mat descriptors1, descriptors2;
     vector<cv::KeyPoint> keypoints1, keypoints2;
     pair<string,string> initial_image_pair_paths;
-    bool FLAG_initial_image_pair = true; // set to true if the initial image pair is provided
+    bool FLAG_initial_image_pair = false; // set to true if the initial image pair is provided
 
     // get the camera intrinsics from calibration file
     // TODO: fix code for getting the camera intrinsics from calinration.txt (function: getCameraIntrinsics)

@@ -559,7 +559,7 @@ int main(){
         cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
-    cv::viz::writeCloud("initial_image_pair_dense_BookStatue.ply", dense_points);
+    cv::viz::writeCloud("initial_image_pair_dense_BookStatue1.ply", dense_points);
     window.spin();
 
     return 0;

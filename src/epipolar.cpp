@@ -156,7 +156,7 @@ pair<string,string> initial_image_pair(vector<string> images){
             cout << "Called ORB" << endl;
             vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors1, descriptors2, keypoints1, keypoints2, 0.75);
             cout << "number of matches: " << matches.size() << endl;
-            // plotMatches(img1, img2, keypoints1, keypoints2, matches);
+            plotMatches(img1, img2, matches);
 
             vector<cv::Point2f> points1, points2;
 
