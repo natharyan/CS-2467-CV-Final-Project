@@ -160,91 +160,91 @@ vector<cv::Point3f> denormalize3DPoints(
     return denormalized_points;
 }
 
-tuple<vector<cv::Point3f>, vector<cv::KeyPoint>, cv::Mat> incrementalAddition(const string& cur_imgpath, const string& prev_imgpath, const cv::Mat& K, const cv::Mat& distortion_coefficients, vector<cv::KeyPoint>& keypoints_prev, cv::Mat& descriptors_prev, vector<cv::Point3f>& points3d_prev) {
-    // Read the new image
-    cv::Mat cur_img = cv::imread(cur_imgpath, cv::IMREAD_GRAYSCALE);
-    cv::Mat prev_img = cv::imread(prev_imgpath, cv::IMREAD_GRAYSCALE);
-    // Detect and compute keypoints and descriptors for the new image
-    vector<cv::KeyPoint> keypoints_curr;
-    cv::Mat descriptors_curr;
-    // cv::Ptr<cv::ORB> orb = cv::ORB::create();
-    // orb->detectAndCompute(img_undistorted, cv::noArray(), keypoints_curr, descriptors_curr);
-    pair<vector<cv::KeyPoint>,cv::Mat> keypoints_descriptors = runORB(cur_imgpath);
-    keypoints_curr = keypoints_descriptors.first;
-    descriptors_curr = keypoints_descriptors.second;
-    
-    // Match features between the previous and current images
-    vector<pair<cv::KeyPoint, cv::KeyPoint>> matches = getMatches_Keypoints(descriptors_prev, descriptors_curr, keypoints_prev, keypoints_curr, 0.75);
-    cout << "Number of matches: " << matches.size() << endl;
-    vector<cv::Point2f> points_prev, points_curr;
-    for (auto match : matches) {
-        points_prev.push_back(match.first.pt);
-        points_curr.push_back(match.second.pt);
-    }
+vector<cv::Point3f> performDenseReconstruction(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& fundamental_matrix, const cv::Mat& K, const vector<cv::Point2f>& points1, const vector<cv::Point2f>& points2, cv::Mat R, cv::Mat t) {
+    vector<cv::Point3f> dense_points;
+    cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
+    cv::Mat Rt_combined;
+    cv::hconcat(R, t, Rt_combined); // Combine R and t
+    cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
 
-    // Plot the matches
-    cout << "Plotting matches..." << endl;
-    plotMatches(prev_img, cur_img, matches);
-    cout << "Matches plotted." << endl;
-    // Estimate the fundamental matrix using RANSAC
-    cout << "Number of points_prev: " << points_prev.size() << endl;
-    cout << "Number of points_curr: " << points_curr.size() << endl;
-    cv::Mat fundamental_matrix = cv::findFundamentalMat(points_prev, points_curr, cv::FM_RANSAC);
-    // fundamental_matrix.convertTo(fundamental_matrix, CV_64F);
-    cout << "Fundamental matrix: " << fundamental_matrix << endl;
-    if(fundamental_matrix.empty()){
-        return make_tuple(points3d_prev, keypoints_curr, descriptors_curr);
-    }
-    // Compute the essential matrix
-    cv::Mat E = getEssentialMatrix(fundamental_matrix, K);
+    for (int y = 0; y < img1.rows; y += 50) { // 10,10
+        for (int x = 0; x < img1.cols; x += 50) {
+            cv::Point2f ref_point(x, y);
+            cv::Mat line = fundamental_matrix * (cv::Mat_<double>(3, 1) << ref_point.x, ref_point.y, 1);
 
-    // Decompose the essential matrix to get rotation and translation candidates
-    vector<pair<cv::Mat, cv::Mat>> rotation_translationCandidates = RotationAndTranslation(E);
+            double a = line.at<double>(0);
+            double b = line.at<double>(1);
+            double c = line.at<double>(2);
 
-    // Normalize points
-    vector<cv::Point2f> norm_points_prev, norm_points_curr;
-    cv::Point2f centroid_prev, centroid_curr;
-    double scale_prev, scale_curr;
-    tie(centroid_prev, scale_prev, norm_points_prev) = normalizePoints(points_prev);
-    tie(centroid_curr, scale_curr, norm_points_curr) = normalizePoints(points_curr);
+            double best_ssd = numeric_limits<double>::max();
+            cv::Point2f best_match;
+            bool found_match = false;
 
-    // Use cheirality check to get the correct rotation and translation
-    cv::Mat R, t;
-    vector<cv::Point3f> points3d_curr;
-    for (pair<cv::Mat, cv::Mat> R_t : rotation_translationCandidates) {
-        cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
-        cv::Mat Rt_combined;
-        cv::hconcat(R_t.first, R_t.second, Rt_combined); // Combine R and t
-        cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
+            for (int u = max(0, x - 100); u < min(img2.cols, x + 100); u++) {
+                int v = round(-(a * u + c) / b);
+                if (v < 0 || v >= img2.rows) continue;
 
-        // Triangulate points
-        points3d_curr = triangulation(P1, P2, norm_points_prev, norm_points_curr);
+                double ssd = 0;
+                bool valid_patch = true;
+                int patch_size = 500;
 
-        // Check cheirality condition
-        bool cheirality = true;
-        for (cv::Point3d point3d : points3d_curr) {
-            if (point3d.z < 0) {
-                cheirality = false;
-                break;
+                for (int dy = -patch_size / 2; dy <= patch_size / 2; ++dy) {
+                    for (int dx = -patch_size / 2; dx <= patch_size / 2; ++dx) {
+                        int x1 = x + dx, y1 = y + dy;
+                        int x2 = u + dx, y2 = v + dy;
+
+                        if (x1 < 0 || x1 >= img1.cols || y1 < 0 || y1 >= img1.rows ||
+                            x2 < 0 || x2 >= img2.cols || y2 < 0 || y2 >= img2.rows) {
+                            valid_patch = false;
+                            break;
+                        }
+
+                        double diff = img1.at<uchar>(y1, x1) - img2.at<uchar>(y2, x2);
+                        ssd += diff * diff;
+                    }
+                    if (!valid_patch) break;
+                }
+
+                if (valid_patch && ssd < best_ssd) {
+                    best_ssd = ssd;
+                    best_match = cv::Point2f(u, v);
+                    found_match = true;
+                    // cout << "Found a match!" << endl;
+                }
             }
-        }
-        if (cheirality) {
-            R = R_t.first;
-            t = R_t.second;
-            break;
+
+            if (found_match) {
+                // normalized points
+
+
+                // vector<cv::Point2f> norm_points1 = {{
+                //     static_cast<float>((ref_point.x - K.at<double>(0, 2)) / K.at<double>(0, 0)),
+                //     static_cast<float>((ref_point.y - K.at<double>(1, 2)) / K.at<double>(1, 1))
+                // }};
+                // vector<cv::Point2f> norm_points2 = {{
+                //     static_cast<float>((best_match.x - K.at<double>(0, 2)) / K.at<double>(0, 0)),
+                //     static_cast<float>((best_match.y - K.at<double>(1, 2)) / K.at<double>(1, 1))
+                // }};
+                vector<cv::Point2f> norm_points1, norm_points2;
+                cv::Point2f centroid1, centroid2;
+                double scale1, scale2;
+                tie(centroid1, scale1, norm_points1) = normalizePoints(vector<cv::Point2f>{ref_point});
+                tie(centroid2, scale2, norm_points2) = normalizePoints(vector<cv::Point2f>{best_match});
+                vector<cv::Point3f> triangulated = triangulation(P1, P2, norm_points1, norm_points2);
+                for(cv::Point3f point: triangulated){
+                    cout << "Triangulated point:" << point << endl;
+                    if(point.z > 0){
+                        dense_points.push_back(point);
+                    }
+                    // normalize the 3d points
+                    dense_points = denormalize3DPoints(dense_points, centroid1, scale1);
+                }
+                cout << "Row " << y << " done." << endl;
+            }
+            cout << "Column " << x << " done." << endl;
         }
     }
-
-    // Denormalize the 3D points
-    points3d_curr = denormalize3DPoints(points3d_curr, centroid_prev, scale_prev);
-    // Append the new 3D points to the previous 3D points
-    points3d_prev.insert(points3d_prev.end(), points3d_curr.begin(), points3d_curr.end());
-
-    // Update the previous keypoints and descriptors
-    // keypoints_prev = keypoints_curr;
-    // descriptors_prev = descriptors_curr;
-
-    return make_tuple(points3d_prev, keypoints_curr, descriptors_curr);
+    return dense_points;
 }
 
 int main(){
@@ -473,7 +473,7 @@ int main(){
     }
 
     cout << "Rotation matrix: " << endl << R << endl;
-    cout << "Translation vector: " << endl << t*cv::norm(t) << endl;
+    cout << "Translation vector: " << endl << t << endl;
     cout << "Translation vector norm: " << cv::norm(t) << endl;
 
     cout << "3d points: " << points3d.size() << endl;
@@ -493,13 +493,15 @@ int main(){
         cout << "3D point: " << points3d[i] << endl;
     }
 
+    vector<cv::Point3f> dense_points = performDenseReconstruction(img1, img2, fundamental_matrix_opencv, K, points1, points2,R,t);
+    cout << "Number of dense points: " << dense_points.size() << endl;
     // Create Viz3d window
     cv::viz::Viz3d window("3D Points Visualization");
     window.setWindowSize(cv::Size(3024, 4032));
     window.setBackgroundColor(cv::viz::Color::black());
 
     // Create point cloud widget
-    cv::viz::WCloud cloud_widget(points3d, cv::viz::Color::white());
+    cv::viz::WCloud cloud_widget(dense_points, cv::viz::Color::white());
     cloud_widget.setRenderingProperty(cv::viz::POINT_SIZE, 5.0);
 
     // Show the point cloud widget
@@ -508,18 +510,18 @@ int main(){
     // Set camera pose to view the point cloud
     // Find the center of the point cloud
     cv::Point3d center(0, 0, 0);
-    for (const auto& pt : points3d) {
+    for (const auto& pt : dense_points) {
         center.x += pt.x;
         center.y += pt.y;
         center.z += pt.z;
     }
-    center.x /= points3d.size();
-    center.y /= points3d.size();
-    center.z /= points3d.size();
+    center.x /= dense_points.size();
+    center.y /= dense_points.size();
+    center.z /= dense_points.size();
 
     // Compute max distance from center to determine camera distance
     double max_dist = 0;
-    for (const auto& pt : points3d) {
+    for (const auto& pt : dense_points) {
         double dist = sqrt(
             pow(pt.x - center.x, 2) +
             pow(pt.y - center.y, 2) +
@@ -535,7 +537,7 @@ int main(){
         cv::Vec3d(0, 1, 0)  // Up vector
     );
     window.setViewerPose(camera_pose);
-    cv::viz::writeCloud("initial_image_pair1.ply", points3d);
+    cv::viz::writeCloud("initial_image_pair_dense.ply", dense_points);
     // Start visualization
     window.spin();
 
