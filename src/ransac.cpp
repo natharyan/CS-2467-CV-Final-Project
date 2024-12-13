@@ -16,9 +16,10 @@ pair<MatrixXd, vector<bool>> ransacFundamentalMatrix( const vector<std::pair<Eig
     MatrixXd bestF(3, 3);
     vector<bool> bestInliers(numMatches, false);
     int maxInliers = 0;
-
-    srand(static_cast<unsigned int>(time(nullptr)));
-
+    // unsigned int seed = static_cast<unsigned int>(time(nullptr));
+    unsigned int seed = 1734056127;
+    srand(seed);
+    cout << "seed: " << seed << endl;
     for (int iter = 0; iter < maxIterations; ++iter) {
         // Randomly select 8 points
         unordered_set<int> indices;
