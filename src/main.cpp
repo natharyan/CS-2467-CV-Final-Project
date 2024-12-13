@@ -267,7 +267,7 @@ int main(){
         eigen_matches.emplace_back(pt1, pt2);
     }
     // TODO: fix ransac fundamental matrix
-    MatrixXd F = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
+    auto [F, inliers] = ransacFundamentalMatrix(eigen_matches, maxIterations, threshold);
     cv::Mat fundamental_matrix_opencv = cv::findFundamentalMat(points1, points2, cv::FM_RANSAC);
     // cout << "fundamental Matrix: " << endl << fundamental_matrix << endl;
     // check if fundamental matrix is empty
