@@ -65,60 +65,6 @@ vector<pair<cv::Mat, cv::Mat>> RotationAndTranslation(cv::Mat essential_matrix) 
     return candidates;
 }
 
-// get the camera intrinsics from calibration file
-pair<cv::Mat,cv::Mat> getCameraIntrinsics(){
-    ifstream calibration_file("src/helpers/calibration.txt");
-    if (!calibration_file.is_open()) {
-        cerr << "Failed to open calibration file!" << endl;
-        throw runtime_error("Calibration file not found");
-    }
-
-    cv::Mat K, distortion_coefficients;
-    string line;
-    vector<double> K_data, dist_data;
-
-    // Read camera matrix
-    if (getline(calibration_file, line)) {
-        stringstream ss(line);
-        double val;
-        while(ss >> val){
-            K_data.push_back(val);
-        }
-    }
-
-    // Read distortion coefficients
-    if (getline(calibration_file, line)) {
-        stringstream ss(line);
-        double val;
-        while(ss >> val){
-            dist_data.push_back(val);
-        }
-    }
-
-    // Verify data
-    if (K_data.size() != 9) {
-        cerr << "Invalid number of values for camera matrix. Got " << K_data.size() << endl;
-        throw runtime_error("Incorrect camera matrix format");
-    }
-
-    if (dist_data.size() != 5) {
-        cerr << "Invalid number of distortion coefficients. Got " << dist_data.size() << endl;
-        throw runtime_error("Incorrect distortion coefficients format");
-    }
-
-    // Create matrices
-    K = (cv::Mat_<double>(3, 3) << 
-        K_data[0], K_data[1], K_data[2], 
-        K_data[3], K_data[4], K_data[5], 
-        K_data[6], K_data[7], K_data[8]);
-
-    distortion_coefficients = (cv::Mat_<double>(1, 5) << 
-        dist_data[0], dist_data[1], dist_data[2], 
-        dist_data[3], dist_data[4]);
-
-    return {K, distortion_coefficients};
-}
-
 // normalize the points
 tuple<cv::Point2f, double, vector<cv::Point2f>> normalizePoints(const vector<cv::Point2f>& points) {
     cv::Point2f centroid(0, 0);
@@ -160,15 +106,22 @@ vector<cv::Point3f> denormalize3DPoints(
     return denormalized_points;
 }
 
-vector<cv::Point3f> performDenseReconstruction(const cv::Mat& img1, const cv::Mat& img2, const cv::Mat& fundamental_matrix, const cv::Mat& K, const vector<cv::Point2f>& points1, const vector<cv::Point2f>& points2, cv::Mat R, cv::Mat t) {
+vector<cv::Point3f> performDenseReconstruction(
+    const cv::Mat& img1, const cv::Mat& img2, 
+    const cv::Mat& fundamental_matrix, const cv::Mat& K, 
+    const vector<cv::Point2f>& points1, const vector<cv::Point2f>& points2, 
+    const cv::Mat& R, const cv::Mat& t) {
+
     vector<cv::Point3f> dense_points;
+
+    // Projection matrices
     cv::Mat P1 = K * cv::Mat::eye(3, 4, CV_64F); // P1 = K * [I | 0]
     cv::Mat Rt_combined;
     cv::hconcat(R, t, Rt_combined); // Combine R and t
     cv::Mat P2 = K * Rt_combined; // P2 = K * [R | t]
 
-    for (int y = 0; y < img1.rows; y += 50) { // 10,10
-        for (int x = 0; x < img1.cols; x += 50) {
+    for (int y = 0; y < img1.rows; y += 10) { // Adjust step size as needed
+        for (int x = 0; x < img1.cols; x += 10) {
             cv::Point2f ref_point(x, y);
             cv::Mat line = fundamental_matrix * (cv::Mat_<double>(3, 1) << ref_point.x, ref_point.y, 1);
 
@@ -180,14 +133,16 @@ vector<cv::Point3f> performDenseReconstruction(const cv::Mat& img1, const cv::Ma
             cv::Point2f best_match;
             bool found_match = false;
 
-            for (int u = max(0, x - 100); u < min(img2.cols, x + 100); u++) {
+            // Search for the best match in the second image along the epipolar line
+            for (int u = max(0, x - 100); u < min(img2.cols, x + 100); ++u) {
                 int v = round(-(a * u + c) / b);
                 if (v < 0 || v >= img2.rows) continue;
 
                 double ssd = 0;
                 bool valid_patch = true;
-                int patch_size = 500;
+                int patch_size = 10;  // Smaller patch size to avoid invalid memory access
 
+                // Calculate the sum of squared differences (SSD) between patches
                 for (int dy = -patch_size / 2; dy <= patch_size / 2; ++dy) {
                     for (int dx = -patch_size / 2; dx <= patch_size / 2; ++dx) {
                         int x1 = x + dx, y1 = y + dy;
@@ -209,41 +164,33 @@ vector<cv::Point3f> performDenseReconstruction(const cv::Mat& img1, const cv::Ma
                     best_ssd = ssd;
                     best_match = cv::Point2f(u, v);
                     found_match = true;
-                    // cout << "Found a match!" << endl;
                 }
             }
 
             if (found_match) {
-                // normalized points
-
-
-                // vector<cv::Point2f> norm_points1 = {{
-                //     static_cast<float>((ref_point.x - K.at<double>(0, 2)) / K.at<double>(0, 0)),
-                //     static_cast<float>((ref_point.y - K.at<double>(1, 2)) / K.at<double>(1, 1))
-                // }};
-                // vector<cv::Point2f> norm_points2 = {{
-                //     static_cast<float>((best_match.x - K.at<double>(0, 2)) / K.at<double>(0, 0)),
-                //     static_cast<float>((best_match.y - K.at<double>(1, 2)) / K.at<double>(1, 1))
-                // }};
+                // Normalize points for triangulation
                 vector<cv::Point2f> norm_points1, norm_points2;
-                cv::Point2f centroid1, centroid2;
-                double scale1, scale2;
-                tie(centroid1, scale1, norm_points1) = normalizePoints(vector<cv::Point2f>{ref_point});
-                tie(centroid2, scale2, norm_points2) = normalizePoints(vector<cv::Point2f>{best_match});
-                vector<cv::Point3f> triangulated = triangulation(P1, P2, norm_points1, norm_points2);
-                for(cv::Point3f point: triangulated){
-                    cout << "Triangulated point:" << point << endl;
-                    if(point.z > 0){
-                        dense_points.push_back(point);
-                    }
-                    // normalize the 3d points
-                    dense_points = denormalize3DPoints(dense_points, centroid1, scale1);
+                cv::undistortPoints(vector<cv::Point2f>{ref_point}, norm_points1, K, cv::noArray());
+                cv::undistortPoints(vector<cv::Point2f>{best_match}, norm_points2, K, cv::noArray());
+
+                // Triangulate the 3D point
+                cv::Mat point4D;
+                cv::triangulatePoints(P1, P2, norm_points1, norm_points2, point4D);
+
+                // Convert homogeneous coordinates to 3D
+                cv::Point3f point;
+                point.x = point4D.at<float>(0) / point4D.at<float>(3);
+                point.y = point4D.at<float>(1) / point4D.at<float>(3);
+                point.z = point4D.at<float>(2) / point4D.at<float>(3);
+
+                if (point.z > 0) { // Consider points with positive depth
+                    cout << "Found a matched 3D point!: " << point << endl;
+                    dense_points.push_back(point);
                 }
-                cout << "Row " << y << " done." << endl;
             }
-            cout << "Column " << x << " done." << endl;
         }
     }
+
     return dense_points;
 }
 
