@@ -5,3 +5,5 @@ proposal.md
 .DS_Store
 venv/
 src/test.cpp
+dataset/temple/
+dataset/bust/
