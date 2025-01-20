@@ -1,51 +1,94 @@
-# Part 1: Feature Detection, Matching, and Initial Pair Selection
+# 3D Reconstruction Pipeline
 
-## Feature Detection and Extraction:
-We first implemented ORB from scratch to detect and extract keypoints and descriptors from the images.*(done)(Manya)*
-Output: Keypoints and descriptors for each image. *(done)*
-Deliverables: Visualization of the detected key points on sample images to confirm quality and density. *(done)*
+This project implements a 3D reconstruction pipeline starting from feature detection and matching, through camera pose estimation, to dense point cloud generation. The pipeline is modular and can be extended or customized for various datasets and reconstruction requirements.
 
-## Feature Matching:
-We then employed a matching algorithm like Brute-Force Matcher (BFMatcher) *(done)(Aryan)* for descriptor matching between image pairs. *(Aryan)*
-We performed filter matching using Lowe’s ratio test to remove ambiguous matches. *(done)(Aryan)*
-Output: Matched keypoints between image pairs. *(Manya)*
-Deliverables: Plotted matches between image pairs to ensure correctness. *(done)(Manya)*
+---
 
-## Initial Pair Selection:
-We used a geometric criterion (e.g., maximum number of inliers from epipolar constraint) to select the best initial image pair *(done).(Aryan)*
-We implemented the 8-point algorithm and RANSAC to estimate the fundamental matrix and remove outliers.*(done)(Manya)*
-Output: Fundamental matrix and inlier matches.*(done)(Aryan)*
-Deliverables: Visualization of the epipolar lines and inliers. *(done)(Aryan)*
+## Table of Contents
+1. [Steps in the Pipeline](#steps-in-the-pipeline)
+2. [How to Run](#how-to-run)
+3. [Modifying the Code](#modifying-the-code)
+5. [License](#license)
+6. [Contribution](#contribution)
 
-#########################################################################################
+---
 
-# Part 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
+## Steps in the Pipeline
 
-## Camera Pose Estimation: *(Aryan)*
-We then decomposed the essential matrix (computed from the fundamental matrix) to obtain the rotation and translation between the initial image pair.*(done) (Aryan)*
-We chose the correct pose by ensuring positive depth for the reconstructed points.*(done) (Aryan)*(NOTE: cheirality test passed only after normalizing and undistorting the images)*
-Output: Rotation and translation matrices for the initial pair. *(done) (Aryan)*
+### Part 1: Feature Detection, Matching, and Initial Pair Selection
 
-## Triangulation: *(done) (Manya) and (Aryan)*
-We implemented a triangulation method (using SVD) to reconstruct 3D points from the matched inliers. We ensured somewhat of depth consistency and removed points that fall behind the cameras. *(done) (Manya) and (Aryan)*
-Output: 3D point cloud for the initial image pair. *(done) (Manya) and (Aryan)*
-Deliverables: Visualization of the initial 3D point cloud using tools like matplotlib or Open3D. *(done) (Aryan)*
-Triangulation: *(done) (Manya) and (Aryan)*
+1. **Feature Detection and Extraction**:  
+   ORB (Oriented FAST and Rotated BRIEF) is used to detect and extract keypoints and descriptors from images.  
+   - **Output**: Keypoints and descriptors for each image.  
 
-#########################################################################################
+2. **Feature Matching**:  
+   Brute-Force Matcher (BFMatcher) matches descriptors between image pairs, and Lowe’s ratio test filters ambiguous matches.  
+   - **Output**: Matched keypoints between image pairs.  
 
-# Part 3: Incremental Reconstruction(Incremental SFM), Dense Reconstruction, and Final Presentation
+3. **Initial Pair Selection**:  
+   The initial image pair is selected based on a geometric criterion, such as the maximum number of inliers from the epipolar constraint. The fundamental matrix is estimated using the 8-point algorithm with RANSAC.  
+   - **Output**: Fundamental matrix and inlier matches.  
 
-## Incremental Image Addition: *(Manya) and (Aryan)*
-We implemented an image addition loop where new images are added based on overlapping 2D-3D correspondences. *(done) (Manya)*
-We estimated the new camera pose using PnP (Perspective-n-Point) with RANSAC. Then we triangulated new points and integrated them into the existing 3D model. *(done) (Manya)*
-Output: Incremental 3D point cloud with more views added. *(done)*
-Deliverables: Visualize step-by-step growth of the 3D model.
+### Part 2: Camera Pose Estimation, Triangulation, and Point Cloud Generation
 
-## Bundle Adjustment(on each incremwent perform bundle adjustment to refine the camera parameters and 3D points):
-We integrated a basic bundle adjustment using libraries to refine camera parameters and 3D points.*(done) (Manya)*
-Output: Optimized camera poses and 3D structure.*(done) (Manya)*
+1. **Camera Pose Estimation**:  
+   The essential matrix is decomposed to retrieve rotation and translation between the initial image pair. A cheirality test ensures correct pose selection.  
+   - **Output**: Rotation and translation matrices.  
 
-## Dense Reconstruction 
-We implemented a dense reconstruction of our 3d points for various datasets, namely the book statue, water canon, and maingate statue. *(done) (Aryan)*
+2. **Triangulation**:  
+   A triangulation algorithm reconstructs 3D points from the matched inliers. Points with inconsistent depth or those behind the cameras are removed.  
+   - **Output**: Initial 3D point cloud.  
 
+### Part 3: Incremental Reconstruction and Dense Reconstruction
+
+1. **Incremental Image Addition**:  
+   New images are added iteratively based on overlapping 2D-3D correspondences. Camera poses are estimated using PnP (Perspective-n-Point) with RANSAC, and new points are triangulated and integrated.  
+   - **Output**: Incremental 3D point cloud.  
+
+2. **Bundle Adjustment**:  
+   A bundle adjustment is performed after each increment to refine camera parameters and 3D points.  
+   - **Output**: Optimized camera poses and 3D structure.  
+
+3. **Dense Reconstruction**:  
+   Dense reconstruction refines the 3D model for datasets such as `book statue`, `water cannon`, and `main gate statue`.  
+   - **Output**: Densified 3D model.
+
+---
+
+## How to Run
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/username/repository-name.git
+   cd repository-name
+2. Running the MakeFile
+   Make sure you're in the right repository on your terminal and run the MakeFile 
+   ```bash
+   make
+3. Run the executable 
+   ```bash 
+   bin/app
+---
+
+## Modifying the Code
+
+Adjusting Parameters
+- Feature extraction parameters (e.g., ORB settings) can be modified in `orb.cpp`.
+- Matching thresholds (e.g., Lowe's ratio) are adjustable in `bfmatcher.cpp`.
+- Own image datasets can be added in `datasets/<dataset_name>/`. 
+- The current calibration data can be replaced in `main.cpp`.
+
+Visualizing
+- Visualizations are generated and saved automatically as `.ply` files. For different visualization, modify the code in `main.cpp`. 
+
+--- 
+
+## License
+
+This project is licensed under the MIT License.
+
+---
+
+## Contribution
+
+We welcome contributions to improve and extend this project.
