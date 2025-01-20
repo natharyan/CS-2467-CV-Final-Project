@@ -7,9 +7,7 @@ This project implements a 3D reconstruction pipeline starting from feature detec
 ## Table of Contents
 1. [Steps in the Pipeline](#steps-in-the-pipeline)
 2. [How to Run](#how-to-run)
-3. [Modifying the Code](#modifying-the-code)
-5. [License](#license)
-6. [Contribution](#contribution)
+3. [Customization](#customization)
 
 ---
 
@@ -70,7 +68,7 @@ This project implements a 3D reconstruction pipeline starting from feature detec
    bin/app
 ---
 
-## Modifying the Code
+## Customization
 
 Adjusting Parameters
 - Feature extraction parameters (e.g., ORB settings) can be modified in `orb.cpp`.
@@ -80,15 +78,3 @@ Adjusting Parameters
 
 Visualizing
 - Visualizations are generated and saved automatically as `.ply` files. For different visualization, modify the code in `main.cpp`. 
-
---- 
-
-## License
-
-This project is licensed under the MIT License.
-
----
-
-## Contribution
-
-We welcome contributions to improve and extend this project.
